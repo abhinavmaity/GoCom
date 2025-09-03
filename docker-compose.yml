@@ -1,0 +1,86 @@
+version: '3.8'
+
+networks:
+  commerce_network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.30.0.0/24
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: commerce_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass123
+      MYSQL_DATABASE: gosocial_db
+      MYSQL_USER: gosocial_user
+      MYSQL_PASSWORD: G0Social@123
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d
+    ports:
+      - '3336:3306'
+    networks:
+      commerce_network:
+        ipv4_address: 172.30.0.10
+
+  redis:
+    image: redis:7-alpine
+    container_name: commerce_redis
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server --requirepass redis_pass_2024
+    volumes:
+      - redis_data:/data
+    networks:
+      commerce_network:
+        ipv4_address: 172.30.0.11
+
+  minio:
+    image: minio/minio
+    container_name: commerce_minio
+    restart: always
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ':9001'
+    networks:
+      commerce_network:
+        ipv4_address: 172.30.0.12
+
+  prometheus:
+    image: prom/prometheus
+    container_name: commerce_prometheus
+    restart: always
+    ports:
+      - '9090:9090'
+    networks:
+      commerce_network:
+        ipv4_address: 172.30.0.13
+
+  grafana:
+    image: grafana/grafana
+    container_name: commerce_grafana
+    restart: always
+    ports:
+      - '3000:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    networks:
+      commerce_network:
+        ipv4_address: 172.30.0.14
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
+
