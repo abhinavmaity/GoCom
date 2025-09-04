@@ -1,68 +1,84 @@
 package main
 
 import (
-    "log"
-    "net/http"
-    
-    "github.com/gin-gonic/gin"
-    
-    "gocom/main/internal/common/config"
-    "gocom/main/internal/common/db"
-    "gocom/main/internal/integrations/storage"
+	"log"
+
+	"github.com/gin-gonic/gin"
+
+	"gocom/main/internal/common/config"
+	"gocom/main/internal/common/db"
+	"gocom/main/internal/common/errors"
+	"gocom/main/internal/models"
+	"gocom/main/internal/seller"
 )
 
 func main() {
-    // Load configuration
-    config.LoadConfig()
+	// Load configuration
+	config.LoadConfig()
+
+	// Connect to services
+	db.ConnectMySQL()
+	
+	/*
+	TODO: Connect redis
+	db.ConnectRedis()
+	*/
+
+	// Auto-migrate database schemas
+	if err := db.GetDB().AutoMigrate(
+		&models.User{},
+		&models.Seller{},
+		&models.Category{},
+		&models.Product{},
+		&models.SKU{},
+		&models.Media{},
+		&models.Inventory{},
+	); err != nil {
+		log.Fatal("Failed to migrate database:", err)
+	}
+
+	seedDatabase()
+
+	// Setup Gin
+	gin.SetMode(config.AppConfig.GinMode)
+	r := gin.Default()
+
+	// Add middleware
+	r.Use(errors.ErrorHandler())
+
+	// Setup routes
+	seller.SetupRoutes(r)
+
+	// Health check
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok", "service": "seller-api"})
+	})
+
+	// Start server
+	log.Printf("🚀 Seller API server starting on port %s", config.AppConfig.ServerPort)
+	log.Fatal(r.Run(":" + config.AppConfig.ServerPort))
+}
+
+
+func seedDatabase() {
+    database := db.GetDB()
     
-    // Connect to services
-    db.ConnectMySQL()
+    // Check if categories already exist
+    var count int64
+    database.Model(&models.Category{}).Count(&count)
     
-    // Initialize MinIO
-    storage.ConnectMinIO()
-    
-    // Initialize MinIO buckets
-    if err := storage.InitializeBuckets(); err != nil {
-        log.Printf("Warning: Could not initialize MinIO buckets: %v", err)
-    }
-    
-    // Set Gin mode
-    gin.SetMode(config.AppConfig.GinMode)
-    
-    // Create Gin router
-    router := gin.Default()
-    
-    // Health check
-    router.GET("/health", func(c *gin.Context) {
-        c.JSON(http.StatusOK, gin.H{
-            "status": "healthy",
-            "service": "seller-api",
-            "integrations": gin.H{
-                "database": "connected",
-                "storage":  "connected",
-            },
-        })
-    })
-    
-    // MinIO test endpoint
-    router.GET("/minio/test", func(c *gin.Context) {
-        // List files in kyc-documents bucket
-        files, err := storage.ListFiles("kyc-documents", "")
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
+    if count == 0 {
+        categories := []models.Category{
+            {ID: 1, Name: "Electronics", SEOSlug: "electronics", IsActive: true},
+            {ID: 2, Name: "Fashion", SEOSlug: "fashion", IsActive: true},
+            {ID: 3, Name: "Books", SEOSlug: "books", IsActive: true},
+            {ID: 4, Name: "Home & Garden", SEOSlug: "home-garden", IsActive: true},
         }
         
-        c.JSON(http.StatusOK, gin.H{
-            "message": "MinIO is working!",
-            "buckets": []string{"kyc-documents", "product-images", "seller-documents", "temp-uploads"},
-            "files_in_kyc": len(files),
-        })
-    })
-    
-    // Start server
-    port := ":" + config.AppConfig.ServerPort
-    log.Printf("🚀 Seller API starting on port %s", config.AppConfig.ServerPort)
-    log.Printf("🔗 MinIO Test: http://localhost%s/minio/test", port)
-    log.Fatal(router.Run(port))
+        for _, category := range categories {
+            database.Create(&category)
+        }
+        
+        log.Println("✅ Categories seeded successfully")
+    }
 }
