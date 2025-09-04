@@ -8,6 +8,7 @@ import (
 	"gocom/main/internal/common/config"
 	"gocom/main/internal/common/db"
 	"gocom/main/internal/common/errors"
+	"gocom/main/internal/integrations/storage"
 	"gocom/main/internal/models"
 	"gocom/main/internal/seller"
 )
@@ -37,7 +38,12 @@ func main() {
 		log.Fatal("Failed to migrate database:", err)
 	}
 
-	seedDatabase()
+	storage.ConnectMinIO()
+	if err := storage.InitializeBuckets(); err != nil {
+		log.Fatalf("Failed to initialize buckets: %v", err)
+	} else {
+		log.Printf("Initialized Buckets!")
+	}
 
 	// Setup Gin
 	gin.SetMode(config.AppConfig.GinMode)
@@ -57,28 +63,4 @@ func main() {
 	// Start server
 	log.Printf("🚀 Seller API server starting on port %s", config.AppConfig.ServerPort)
 	log.Fatal(r.Run(":" + config.AppConfig.ServerPort))
-}
-
-
-func seedDatabase() {
-    database := db.GetDB()
-    
-    // Check if categories already exist
-    var count int64
-    database.Model(&models.Category{}).Count(&count)
-    
-    if count == 0 {
-        categories := []models.Category{
-            {ID: 1, Name: "Electronics", SEOSlug: "electronics", IsActive: true},
-            {ID: 2, Name: "Fashion", SEOSlug: "fashion", IsActive: true},
-            {ID: 3, Name: "Books", SEOSlug: "books", IsActive: true},
-            {ID: 4, Name: "Home & Garden", SEOSlug: "home-garden", IsActive: true},
-        }
-        
-        for _, category := range categories {
-            database.Create(&category)
-        }
-        
-        log.Println("✅ Categories seeded successfully")
-    }
 }
