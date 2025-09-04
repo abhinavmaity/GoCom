@@ -29,11 +29,13 @@ func main() {
 	if err := db.GetDB().AutoMigrate(
 		&models.User{},
 		&models.Seller{},
+		&models.KYC{},
+		&models.SKU{},
+		&models.Inventory{},
+		&models.Media{},
 		&models.Category{},
 		&models.Product{},
-		&models.SKU{},
-		&models.Media{},
-		&models.Inventory{},
+		&models.Address{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
