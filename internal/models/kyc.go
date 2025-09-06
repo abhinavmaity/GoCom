@@ -10,4 +10,6 @@ type KYC struct {
 	Status      int `gorm:"default:0"` // 0=pending, 1=approved, 2=rejected
 	Remarks     string
 	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Seller      Seller `gorm:"foreignKey:SellerID"`
 }
