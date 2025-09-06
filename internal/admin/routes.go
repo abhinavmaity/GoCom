@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"gocom/main/internal/common/auth"
 	"gocom/main/internal/models"
 	"net/http"
 	"strconv"
@@ -11,22 +10,22 @@ import (
 )
 
 // SetupAdminRoutes sets up all admin-related routes
-func SetupAdminRoutes(router *gin.Engine, database *gorm.DB, authService *auth.AuthService) {
-	adminGroup := router.Group("/v1/admin")
+// func SetupAdminRoutes(router *gin.Engine, database *gorm.DB, authService *auth.AuthService) {
+// 	adminGroup := router.Group("/v1/admin")
 
-	// Apply JWT middleware and admin role requirement
-	adminGroup.Use(authService.JWTMiddleware())
-	adminGroup.Use(authService.RequireRole(auth.RoleAdmin))
+// 	// Apply JWT middleware and admin role requirement
+// 	adminGroup.Use(authService.JWTMiddleware())
+// 	adminGroup.Use(authService.RequireRole(auth.RoleAdmin))
 
-	// KYC Management Routes
-	adminGroup.GET("/kyc/pending", GetKYCPending(database))
-	adminGroup.POST("/kyc/:id/approve", ApproveKYC(database))
-	adminGroup.POST("/kyc/:id/reject", RejectKYC(database))
+// 	// KYC Management Routes
+// 	adminGroup.GET("/kyc/pending", GetKYCPending(database))
+// 	adminGroup.POST("/kyc/:id/approve", ApproveKYC(database))
+// 	adminGroup.POST("/kyc/:id/reject", RejectKYC(database))
 
-	// Catalog Management Routes
-	adminGroup.POST("/catalog/categories", CreateCategory(database))
-	adminGroup.PATCH("/catalog/attributes", UpdateCategoryAttributes(database))
-}
+// 	// Catalog Management Routes
+// 	adminGroup.POST("/catalog/categories", CreateCategory(database))
+// 	adminGroup.PATCH("/catalog/attributes", UpdateCategoryAttributes(database))
+// }
 
 // GetKYCPending retrieves all pending KYC submissions
 func GetKYCPending(db *gorm.DB) gin.HandlerFunc {

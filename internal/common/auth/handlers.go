@@ -177,9 +177,11 @@ import (
 	"encoding/hex"
 	"gocom/main/internal/models"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/pquerna/otp/totp"
 	"gorm.io/gorm"
 )
@@ -302,6 +304,96 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		User:    user,
 		Message: "User registered successfully",
 	})
+}
+func (ah *AuthHandler) JWTMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Authorization header missing",
+			})
+			c.Abort()
+			return
+		}
+
+		// Parse Bearer token
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid authorization header format. Use: Bearer <token>",
+			})
+			c.Abort()
+			return
+		}
+
+		tokenString := parts[1]
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
+			return []byte(ah.authService.jwtSecret), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid or expired token",
+			})
+			c.Abort()
+			return
+		}
+
+		// Extract claims
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid token claims",
+			})
+			c.Abort()
+			return
+		}
+
+		// Check token expiration
+		if exp, ok := claims["exp"].(float64); ok {
+			if time.Now().Unix() > int64(exp) {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Token has expired",
+				})
+				c.Abort()
+				return
+			}
+		}
+
+		// Set user information in context
+		c.Set("user_id", claims["user_id"])
+		c.Set("email", claims["email"])
+		c.Set("role", claims["role"])
+
+		c.Next()
+	}
+}
+
+// RequireRole middleware to check if user has required role
+func (ah *AuthHandler) RequireRole(requiredRole string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Role information missing",
+			})
+			c.Abort()
+			return
+		}
+		if role != requiredRole {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Insufficient permissions. Required role: " + requiredRole,
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 // Login user with refresh token
