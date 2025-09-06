@@ -36,6 +36,8 @@ func main() {
 		&models.Category{},
 		&models.Product{},
 		&models.Address{},
+		// Auto-migrate database schemas
+		&models.SellerUser{}, // Add this
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
