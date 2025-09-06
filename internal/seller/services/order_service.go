@@ -1,13 +1,13 @@
-package services
+apackage services
 
 import (
 	"errors"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gocom/main/internal/common/db"
 	"gocom/main/internal/models"
-	"github.com/shopspring/decimal"
 )
 
 type OrderService struct {
@@ -18,123 +18,304 @@ func NewOrderService() *OrderService {
 	return &OrderService{DB: db.GetDB()}
 }
 
-// Get seller orders (simplified)
-func (os *OrderService) GetSellerOrders(sellerID uint) ([]OrderSummary, error) {
-	var orders []OrderSummary
-	
-	query := `
-		SELECT DISTINCT o.id, o.total, o.status, o.payment_status, o.created_at,
-		       u.name as customer_name
-		FROM orders o
-		JOIN order_items oi ON o.id = oi.order_id  
-		JOIN users u ON o.user_id = u.id
-		WHERE oi.seller_id = ?
-		ORDER BY o.created_at DESC`
+// Get all orders for seller using GORM
+func (os *OrderService) GetSellerOrders(sellerID uint, page, limit int) ([]OrderResponse, error) {
+	var orders []models.Order
+	offset := (page - 1) * limit
 
-	if err := os.DB.Raw(query, sellerID).Scan(&orders).Error; err != nil {
+	// Get orders where seller has items using GORM joins
+	err := os.DB.
+		Joins("JOIN order_items oi ON orders.id = oi.order_id").
+		Where("oi.seller_id = ?", sellerID).
+		Group("orders.id").
+		Order("orders.created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&orders).Error
+
+	if err != nil {
 		return nil, err
 	}
 
-	return orders, nil
+	// Convert to response format and get item counts
+	var response []OrderResponse
+	for _, order := range orders {
+		// Get item count for this order and seller
+		var itemCount int64
+		os.DB.Model(&models.OrderItem{}).
+			Where("order_id = ? AND seller_id = ?", order.ID, sellerID).
+			Count(&itemCount)
+
+		response = append(response, OrderResponse{
+			ID:            order.ID,
+			UserID:        order.UserID,
+			Total:         order.Total,
+			Tax:           order.Tax,
+			Shipping:      order.Shipping,
+			Status:        order.Status,
+			StatusText:    GetStatusText(order.Status),
+			PaymentStatus: order.PaymentStatus,
+			ItemCount:     int(itemCount),
+			CreatedAt:     order.CreatedAt,
+			UpdatedAt:     order.UpdatedAt,
+		})
+	}
+
+	return response, nil
 }
 
-// Get order details
-func (os *OrderService) GetOrderDetails(orderID, sellerID uint) (*OrderDetails, error) {
-	// Verify seller access
+// Get order details for seller using GORM
+func (os *OrderService) GetOrderDetails(orderID, sellerID uint) (*OrderDetailResponse, error) {
+	var order models.Order
+
+	// First check if seller has items in this order
 	var count int64
 	os.DB.Model(&models.OrderItem{}).
 		Where("order_id = ? AND seller_id = ?", orderID, sellerID).
 		Count(&count)
-	
+
 	if count == 0 {
+		return nil, errors.New("order not found or unauthorized")
+	}
+
+	// Get order details using GORM
+	if err := os.DB.First(&order, orderID).Error; err != nil {
 		return nil, errors.New("order not found")
 	}
 
-	var order models.Order
-	if err := os.DB.Preload("Address").First(&order, orderID).Error; err != nil {
+	// Get order items for this seller
+	items, err := os.GetOrderItems(orderID, sellerID)
+	if err != nil {
 		return nil, err
 	}
 
-	var customer models.User
-	os.DB.First(&customer, order.UserID)
+	response := &OrderDetailResponse{
+		ID:            order.ID,
+		UserID:        order.UserID,
+		Total:         order.Total,
+		Tax:           order.Tax,
+		Shipping:      order.Shipping,
+		Status:        order.Status,
+		StatusText:    GetStatusText(order.Status),
+		PaymentStatus: order.PaymentStatus,
+		AddressID:     order.AddressID,
+		Items:         items,
+		CreatedAt:     order.CreatedAt,
+		UpdatedAt:     order.UpdatedAt,
+	}
 
-	return &OrderDetails{
-		ID:           order.ID,
-		CustomerName: customer.Name,
-		Total:        order.Total,
-		Status:       order.Status,
-		StatusText:   os.getStatusText(order.Status),
-		CreatedAt:    order.CreatedAt,
-	}, nil
+	return response, nil
 }
 
-// Update order status
-func (os *OrderService) UpdateOrderStatus(orderID, sellerID uint, status int) error {
-	// Verify seller access
+// Get order items using GORM with proper joins
+func (os *OrderService) GetOrderItems(orderID, sellerID uint) ([]OrderItemResponse, error) {
+	var items []models.OrderItem
+
+	// Get order items with product and SKU info using GORM
+	err := os.DB.
+		Preload("SKU").
+		Preload("SKU.Product").
+		Where("order_id = ? AND seller_id = ?", orderID, sellerID).
+		Find(&items).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to response format
+	var response []OrderItemResponse
+	for _, item := range items {
+		response = append(response, OrderItemResponse{
+			ID:           item.ID,
+			SKUCode:      item.SKU.SKUCode,
+			ProductTitle: item.SKU.Product.Title,
+			Qty:          item.Qty,
+			Price:        item.Price,
+			Tax:          item.Tax,
+		})
+	}
+
+	return response, nil
+}
+
+// Update order status using GORM
+func (os *OrderService) UpdateOrderStatus(orderID, sellerID uint, newStatus int) error {
+	// Verify seller has items in this order
 	var count int64
 	os.DB.Model(&models.OrderItem{}).
 		Where("order_id = ? AND seller_id = ?", orderID, sellerID).
 		Count(&count)
-	
+
 	if count == 0 {
-		return errors.New("order not found")
+		return errors.New("order not found or unauthorized")
 	}
 
+	// Update order status using GORM
 	return os.DB.Model(&models.Order{}).
 		Where("id = ?", orderID).
-		Update("status", status).Error
+		Updates(map[string]interface{}{
+			"status":     newStatus,
+			"updated_at": time.Now(),
+		}).Error
 }
 
-// Ship order
-func (os *OrderService) ShipOrder(orderID, sellerID uint, provider, awb string) error {
-	tx := os.DB.Begin()
+// Ship order using GORM
+func (os *OrderService) ShipOrder(orderID, sellerID uint, req *ShipOrderRequest) error {
+	// Verify seller owns this order
+	var count int64
+	os.DB.Model(&models.OrderItem{}).
+		Where("order_id = ? AND seller_id = ?", orderID, sellerID).
+		Count(&count)
 
-	// Create shipment
+	if count == 0 {
+		return errors.New("order not found or unauthorized")
+	}
+
+	// Create shipment record using GORM
 	shipment := &models.Shipment{
-		OrderID:  orderID,
-		Provider: provider,
-		AWB:      awb,
-		Status:   1,
+		OrderID:   orderID,
+		Provider:  req.Provider,
+		AWB:       req.AWB,
+		Status:    1, // Shipped
+		CreatedAt: time.Now(),
 	}
-	
-	if err := tx.Create(shipment).Error; err != nil {
-		tx.Rollback()
+
+	if err := os.DB.Create(shipment).Error; err != nil {
 		return err
 	}
 
-	// Update order status to shipped
-	if err := tx.Model(&models.Order{}).Where("id = ?", orderID).
-		Update("status", 2).Error; err != nil {
-		tx.Rollback()
-		return err
+	// Update order status to shipped using GORM
+	return os.DB.Model(&models.Order{}).
+		Where("id = ?", orderID).
+		Updates(map[string]interface{}{
+			"status":     2, // Shipped
+			"updated_at": time.Now(),
+		}).Error
+}
+
+// Get order statistics using GORM aggregation
+func (os *OrderService) GetOrderStats(sellerID uint) (*OrderStatsResponse, error) {
+	var stats OrderStatsResponse
+
+	// Total orders count using GORM
+	os.DB.Model(&models.OrderItem{}).
+		Select("COUNT(DISTINCT order_id)").
+		Where("seller_id = ?", sellerID).
+		Scan(&stats.TotalOrders)
+
+	// Orders by status using GORM with joins
+	type StatusCount struct {
+		Status int `json:"status"`
+		Count  int `json:"count"`
 	}
 
-	return tx.Commit().Error
-}
+	var statusCounts []StatusCount
+	os.DB.Model(&models.Order{}).
+		Select("orders.status, COUNT(DISTINCT orders.id) as count").
+		Joins("JOIN order_items ON orders.id = order_items.order_id").
+		Where("order_items.seller_id = ?", sellerID).
+		Group("orders.status").
+		Scan(&statusCounts)
 
-func (os *OrderService) getStatusText(status int) string {
-	statusMap := map[int]string{0: "New", 1: "Confirmed", 2: "Shipped", 3: "Delivered"}
-	if text, exists := statusMap[status]; exists {
-		return text
+	// Map status counts
+	stats.NewOrders = 0
+	stats.ProcessingOrders = 0
+	stats.ShippedOrders = 0
+
+	for _, sc := range statusCounts {
+		switch sc.Status {
+		case 0:
+			stats.NewOrders = sc.Count
+		case 1:
+			stats.ProcessingOrders = sc.Count
+		case 2:
+			stats.ShippedOrders = sc.Count
+		}
 	}
-	return "Unknown"
+
+	// Total revenue using GORM aggregation
+	var totalRevenue decimal.Decimal
+	os.DB.Model(&models.OrderItem{}).
+		Select("COALESCE(SUM(price * qty), 0)").
+		Where("seller_id = ?", sellerID).
+		Scan(&totalRevenue)
+	stats.TotalRevenue = totalRevenue
+
+	return &stats, nil
 }
 
-// Simple DTOs
-type OrderSummary struct {
-	ID           uint            `json:"id"`
-	CustomerName string          `json:"customer_name"`
-	Total        decimal.Decimal `json:"total"`
-	Status       int             `json:"status"`
-	CreatedAt    time.Time       `json:"created_at"`
+// DTOs (same as before)
+type OrderResponse struct {
+	ID            uint            `json:"id"`
+	UserID        uint            `json:"user_id"`
+	Total         decimal.Decimal `json:"total"`
+	Tax           decimal.Decimal `json:"tax"`
+	Shipping      decimal.Decimal `json:"shipping"`
+	Status        int             `json:"status"`
+	StatusText    string          `json:"status_text"`
+	PaymentStatus int             `json:"payment_status"`
+	ItemCount     int             `json:"item_count"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
-type OrderDetails struct {
+type OrderDetailResponse struct {
+	ID            uint                  `json:"id"`
+	UserID        uint                  `json:"user_id"`
+	Total         decimal.Decimal       `json:"total"`
+	Tax           decimal.Decimal       `json:"tax"`
+	Shipping      decimal.Decimal       `json:"shipping"`
+	Status        int                   `json:"status"`
+	StatusText    string                `json:"status_text"`
+	PaymentStatus int                   `json:"payment_status"`
+	AddressID     uint                  `json:"address_id"`
+	Items         []OrderItemResponse   `json:"items"`
+	CreatedAt     time.Time             `json:"created_at"`
+	UpdatedAt     time.Time             `json:"updated_at"`
+}
+
+type OrderItemResponse struct {
 	ID           uint            `json:"id"`
-	CustomerName string          `json:"customer_name"`
-	Total        decimal.Decimal `json:"total"`
-	Status       int             `json:"status"`
-	StatusText   string          `json:"status_text"`
-	CreatedAt    time.Time       `json:"created_at"`
+	SKUCode      string          `json:"sku_code"`
+	ProductTitle string          `json:"product_title"`
+	Qty          int             `json:"quantity"`
+	Price        decimal.Decimal `json:"price"`
+	Tax          decimal.Decimal `json:"tax"`
+}
+
+type ShipOrderRequest struct {
+	Provider string `json:"provider" binding:"required"`
+	AWB      string `json:"awb" binding:"required"`
+}
+
+type UpdateStatusRequest struct {
+	Status int `json:"status" binding:"required"`
+}
+
+type OrderStatsResponse struct {
+	TotalOrders       int             `json:"total_orders"`
+	NewOrders         int             `json:"new_orders"`
+	ProcessingOrders  int             `json:"processing_orders"`
+	ShippedOrders     int             `json:"shipped_orders"`
+	TotalRevenue      decimal.Decimal `json:"total_revenue"`
+}
+
+func GetStatusText(status int) string {
+	switch status {
+	case 0:
+		return "New"
+	case 1:
+		return "Processing"
+	case 2:
+		return "Shipped"
+	case 3:
+		return "Delivered"
+	case 4:
+		return "Cancelled"
+	case 5:
+		return "Returned"
+	default:
+		return "Unknown"
+	}
 }
 

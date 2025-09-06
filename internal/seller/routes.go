@@ -10,7 +10,7 @@ func SetupRoutes(r *gin.Engine) {
 	sellerHandler := handlers.NewSellerHandler()       // Phase 2
 	
 
-	// remaining from Phase 3	//kycHandler := handlers.NewKYCHandler()             // Phase 3  
+	kycHandler := handlers.NewKYCHandler()             // Phase 3  
 	
 
 	productHandler := handlers.NewProductHandler()     // Phase 4
@@ -29,7 +29,6 @@ func SetupRoutes(r *gin.Engine) {
 		v1.PATCH("/sellers/:id", sellerHandler.UpdateSeller)
 	}
 
-	/*
 	// Phase 3: KYC Management routes
 	{
 		v1.POST("/sellers/:id/kyc", kycHandler.UploadKYC)
@@ -37,7 +36,6 @@ func SetupRoutes(r *gin.Engine) {
 		v1.GET("/sellers/:id/kyc/:docId", kycHandler.GetKYCDocument)
 		v1.DELETE("/sellers/:id/kyc/:docId", kycHandler.DeleteKYC)
 	}
-	*/
 
 	// Phase 4: Product Catalog routes
 	{
