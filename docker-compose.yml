@@ -10,7 +10,7 @@ networks:
 services:
   mysql:
     image: mysql:8.0
-    container_name: commerce_mysql
+    container_name: gocom_mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: rootpass123
@@ -55,29 +55,6 @@ services:
     networks:
       commerce_network:
         ipv4_address: 172.30.0.12
-
-  prometheus:
-    image: prom/prometheus
-    container_name: commerce_prometheus
-    restart: always
-    ports:
-      - '9090:9090'
-    networks:
-      commerce_network:
-        ipv4_address: 172.30.0.13
-
-  grafana:
-    image: grafana/grafana
-    container_name: commerce_grafana
-    restart: always
-    ports:
-      - '3000:3000'
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin123
-    networks:
-      commerce_network:
-        ipv4_address: 172.30.0.14
 
 volumes:
   mysql_data:

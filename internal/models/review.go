@@ -11,7 +11,7 @@ type Review struct {
 	ProductID uint `gorm:"not null"`
 	Rating    int  `gorm:"not null"`
 	Text      string
-	Media     json.RawMessage `gorm:"type:jsonb"`
+	Media     json.RawMessage `gorm:"type:json"`
 	Status    int             `gorm:"default:1"` // 1=approved, 0=pending
 	CreatedAt time.Time
 }

@@ -11,6 +11,6 @@ type AuditLog struct {
 	Action    string          `gorm:"not null"`
 	Entity    string          `gorm:"not null"`
 	EntityID  uint            `gorm:"not null"`
-	Meta      json.RawMessage `gorm:"type:jsonb"`
+	Meta      json.RawMessage `gorm:"type:json"`
 	CreatedAt time.Time
 }
