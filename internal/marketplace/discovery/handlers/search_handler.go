@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -33,14 +32,4 @@ func SearchProducts(db *gorm.DB) gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, out)
 	}
-}
-
-func atoiDefault(s string, def int) int {
-	if s == "" {
-		return def
-	}
-	if v, err := strconv.Atoi(s); err == nil && v > 0 {
-		return v
-	}
-	return def
 }
