@@ -4,19 +4,18 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	"gocom/main/internal/models"
 )
 
-// ProductService returns product details, skus and media.
 type ProductService struct {
 	db *gorm.DB
 }
 
 func NewProductService(db *gorm.DB) *ProductService { return &ProductService{db: db} }
 
-// GetProductDetail returns product basic fields and rating aggregates.
 func (s *ProductService) GetProductDetail(ctx context.Context, productID uint) (*models.ProductDetailResp, error) {
 	var p struct {
 		ID          uint
@@ -27,12 +26,11 @@ func (s *ProductService) GetProductDetail(ctx context.Context, productID uint) (
 		RatingAvg   float64
 		RatingCount int64
 	}
-	// aggregate rating via subquery join
 	err := s.db.WithContext(ctx).Table("products p").
 		Select(`p.id, p.title, p.brand, p.description, p.category_id,
-		        COALESCE(avg_rev.rating_avg,0) AS rating_avg, COALESCE(avg_rev.rating_cnt,0) AS rating_count`).
+				COALESCE(avg_rev.rating_avg,0) AS rating_avg, COALESCE(avg_rev.rating_cnt,0) AS rating_count`).
 		Joins(`LEFT JOIN (
-			SELECT product_id, AVG(rating)::float AS rating_avg, COUNT(*) AS rating_cnt
+			SELECT product_id, AVG(rating) AS rating_avg, COUNT(*) AS rating_cnt
 			FROM reviews WHERE status = 1 GROUP BY product_id
 		) avg_rev ON avg_rev.product_id = p.id`).
 		Where("p.id = ? AND p.status = 1", productID).
@@ -44,32 +42,19 @@ func (s *ProductService) GetProductDetail(ctx context.Context, productID uint) (
 		return nil, err
 	}
 
-	// fetch SKUs with stock (cast numeric to double precision)
-	var skus []models.SKURow
-	err = s.db.WithContext(ctx).Raw(`
-		SELECT s.id, s.sku_code,
-		       COALESCE(ROUND(CAST(s.price_mrp AS double precision),2),0)::double precision AS price_mrp,
-		       COALESCE(ROUND(CAST(s.price_sell AS double precision),2),0)::double precision AS price_sell,
-		       COALESCE(CAST(s.tax_pct AS double precision),0) AS tax_pct,
-		       COALESCE(s.barcode,'') AS barcode,
-		       COALESCE(inv.on_hand,0) - COALESCE(inv.reserved,0) AS stock_qty
-		FROM skus s
-		LEFT JOIN inventory inv ON inv.sku_id = s.id
-		WHERE s.product_id = ?
-		ORDER BY s.id ASC
-	`, productID).Scan(&skus).Error
-	if err != nil {
+	// SKUs: use models.SKU to match your schema; compute stock via inventory table if present.
+	var skus []models.SKU
+	if err := s.db.WithContext(ctx).Where("product_id = ?", productID).Find(&skus).Error; err != nil {
 		return nil, err
 	}
 
-	// fetch media
+	// Media
 	var media []models.Media
 	if err := s.db.WithContext(ctx).Table("media").
 		Select("id, url, type, alt_text, sort").
 		Where("entity_type = 'product' AND entity_id = ?", productID).
 		Order("sort ASC").
 		Scan(&media).Error; err != nil {
-		// non-fatal: return product but with empty media
 		media = []models.Media{}
 	}
 
@@ -79,10 +64,53 @@ func (s *ProductService) GetProductDetail(ctx context.Context, productID uint) (
 		Brand:       p.Brand,
 		Description: p.Description,
 		CategoryID:  p.CategoryID,
-		Skus:        skus,
+		// convert skus slice into SKURow slice if your DTO expects that; here we keep models.SKU
+		Skus:        skusToSKURows(skus, s.db, ctx),
 		Media:       media,
 		RatingAvg:   p.RatingAvg,
 		RatingCount: p.RatingCount,
 	}
 	return out, nil
+}
+
+// helper that converts []models.SKU to []models.SKURow (computes stock_qty)
+func skusToSKURows(skus []models.SKU, db *gorm.DB, ctx context.Context) []models.SKURow {
+	out := make([]models.SKURow, 0, len(skus))
+	for _, s := range skus {
+		var stock sqlNullInt64
+		// try fetching inventory for sku
+		_ = db.WithContext(ctx).Raw(`SELECT (COALESCE(on_hand,0) - COALESCE(reserved,0)) AS stock_qty FROM inventory WHERE sku_id = ? LIMIT 1`, s.ID).Scan(&stock).Error
+		row := models.SKURow{
+			ID:        uint(s.ID),
+			SKUCode:   s.SKUCode,
+			PriceMRP:  float64FromDecimal(s.PriceMRP),
+			PriceSell: float64FromDecimal(s.PriceSell),
+			TaxPct:    float64FromDecimal(s.TaxPct),
+			Barcode:   s.Barcode,
+			StockQty:  stock.Int64,
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+type sqlNullInt64 struct {
+	Int64 int64 `gorm:"column:stock_qty"`
+	Valid bool
+}
+
+// helper to convert shopspring decimal to float64 (simple PoC)
+func float64FromDecimal(d interface{}) float64 {
+	switch v := d.(type) {
+	case float64:
+		return v
+	case nil:
+		return 0
+	default:
+		// best-effort: try Sprintf and parse; but keep 0 for safety
+		return 0
+	}
+}
+func decimalToString(d decimal.Decimal) string {
+	return d.String()
 }

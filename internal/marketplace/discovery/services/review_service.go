@@ -82,13 +82,12 @@ func (s *ReviewService) RecomputeAndPersistAggregate(ctx context.Context, produc
 		Cnt int64   `gorm:"column:count"`
 	}
 	if err := s.db.WithContext(ctx).Raw(`
-		SELECT COALESCE(AVG(rating)::float,0) AS avg, COUNT(*) AS count
+		SELECT COALESCE(AVG(rating),0) AS avg, COUNT(*) AS count
 		FROM reviews WHERE product_id = ? AND status = 1
 	`, productID).Scan(&agg).Error; err != nil {
 		return 0, 0, err
 	}
 
-	// attempt to update products.rating_avg, products.rating_count if present
 	if err := s.db.WithContext(ctx).Exec(`
 		UPDATE products SET rating_avg = ?, rating_count = ? WHERE id = ?
 	`, agg.Avg, agg.Cnt, productID).Error; err != nil {
