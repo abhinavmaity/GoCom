@@ -15,7 +15,6 @@ type Return struct {
 	RefundID    *uint  `json:"refund_id,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	
-	// Relations
 	Order     Order     `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 	OrderItem OrderItem `gorm:"foreignKey:OrderItemID" json:"order_item,omitempty"`
 	Refund    *Refund   `gorm:"foreignKey:RefundID" json:"refund,omitempty"`
@@ -29,6 +28,5 @@ type Refund struct {
 	ProcessedAt *time.Time      `json:"processed_at,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	
-	// Relations
 	Payment Payment `gorm:"foreignKey:PaymentID" json:"payment,omitempty"`
 }

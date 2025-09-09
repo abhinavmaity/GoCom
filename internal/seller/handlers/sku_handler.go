@@ -18,8 +18,6 @@ func NewSKUHandler() *SKUHandler {
 	}
 }
 
-// Add SKU to product
-// POST /products/:id/skus
 func (sh *SKUHandler) CreateSKU(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -49,8 +47,6 @@ func (sh *SKUHandler) CreateSKU(c *gin.Context) {
 	})
 }
 
-// Get all SKUs for product
-// GET /products/:id/skus
 func (sh *SKUHandler) GetProductSKUs(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -70,8 +66,6 @@ func (sh *SKUHandler) GetProductSKUs(c *gin.Context) {
 	})
 }
 
-// Update SKU
-// PATCH /skus/:id
 func (sh *SKUHandler) UpdateSKU(c *gin.Context) {
 	skuID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -101,8 +95,6 @@ func (sh *SKUHandler) UpdateSKU(c *gin.Context) {
 	})
 }
 
-// Delete SKU
-// DELETE /skus/:id
 func (sh *SKUHandler) DeleteSKU(c *gin.Context) {
 	skuID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {

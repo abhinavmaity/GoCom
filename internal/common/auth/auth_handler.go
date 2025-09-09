@@ -2,7 +2,7 @@ package auth
 
 import (
 	"net/http"
-
+	"log"
 	"github.com/gin-gonic/gin"
 )
 
@@ -109,29 +109,36 @@ func (ah *AuthHandler) RefreshToken(c *gin.Context) {
 }
 
 func (ah *AuthHandler) GetProfile(c *gin.Context) {
+	log.Println("Auth Handler: GetProfile called")
+	
 	userID := GetUserID(c)
+	log.Printf("Auth Handler: User ID from context: %d", userID)
+	
 	if userID == 0 {
+		log.Println("Auth Handler: No user ID in context")
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
-			"error":   "unauthorized",
+			"error": "unauthorized",
 		})
 		return
 	}
 
 	user, err := ah.AuthService.GetUser(userID)
 	if err != nil {
+		log.Printf("Auth Handler: Error getting user: %v", err)
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"error":   err.Error(),
+			"error": err.Error(),
 		})
 		return
 	}
 
+	log.Printf("Auth Handler: Successfully retrieved user: %s", user.Email)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"id":    user.ID,
-			"name":  user.Name,
+			"id": user.ID,
+			"name": user.Name,
 			"email": user.Email,
 			"phone": user.Phone,
 			"status": user.Status,

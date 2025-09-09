@@ -17,9 +17,8 @@ func NewAddressService() *AddressService {
 	return &AddressService{DB: db.GetDB()}
 }
 
-// Add address for seller
+
 func (as *AddressService) AddAddress(sellerID uint, req *AddAddressRequest) (*models.Address, error) {
-	// Verify seller exists
 	var seller models.Seller
 	if err := as.DB.First(&seller, sellerID).Error; err != nil {
 		return nil, errors.New("seller not found")
@@ -43,7 +42,6 @@ func (as *AddressService) AddAddress(sellerID uint, req *AddAddressRequest) (*mo
 	return address, nil
 }
 
-// Get all addresses for seller
 func (as *AddressService) GetSellerAddresses(sellerID uint) ([]AddressResponse, error) {
 	var addresses []models.Address
 	if err := as.DB.Where("seller_id = ?", sellerID).
@@ -68,7 +66,7 @@ func (as *AddressService) GetSellerAddresses(sellerID uint) ([]AddressResponse, 
 	return response, nil
 }
 
-// Update address
+
 func (as *AddressService) UpdateAddress(addressID, sellerID uint, req *UpdateAddressRequest) (*models.Address, error) {
 	var address models.Address
 	if err := as.DB.Where("id = ? AND seller_id = ?", addressID, sellerID).
@@ -76,7 +74,6 @@ func (as *AddressService) UpdateAddress(addressID, sellerID uint, req *UpdateAdd
 		return nil, errors.New("address not found")
 	}
 
-	// Update fields
 	if req.Line1 != nil {
 		address.Line1 = *req.Line1
 	}
@@ -103,7 +100,6 @@ func (as *AddressService) UpdateAddress(addressID, sellerID uint, req *UpdateAdd
 	return &address, nil
 }
 
-// Delete address
 func (as *AddressService) DeleteAddress(addressID, sellerID uint) error {
 	result := as.DB.Where("id = ? AND seller_id = ?", addressID, sellerID).
 		Delete(&models.Address{})
@@ -119,7 +115,7 @@ func (as *AddressService) DeleteAddress(addressID, sellerID uint) error {
 	return nil
 }
 
-// DTOs
+
 type AddAddressRequest struct {
 	Line1   string `json:"line1" binding:"required"`
 	Line2   string `json:"line2"`

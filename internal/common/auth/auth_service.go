@@ -20,19 +20,16 @@ func NewAuthService() *AuthService {
 }
 
 func (as *AuthService) Register(req *RegisterRequest) (*models.User, error) {
-	// Check if user exists
 	var existingUser models.User
 	if err := as.DB.Where("email = ? OR phone = ?", req.Email, req.Phone).First(&existingUser).Error; err == nil {
 		return nil, errors.New("user already exists with this email or phone")
 	}
 
-	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, errors.New("failed to hash password")
 	}
 
-	// Create user
 	user := &models.User{
 		Name:         req.Name,
 		Email:        req.Email,
@@ -53,18 +50,14 @@ func (as *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	if err := as.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
 		return nil, errors.New("invalid credentials")
 	}
-
-	// Check password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
-	// Check status
 	if user.Status != models.UserStatusActive {
 		return nil, errors.New("account is inactive")
 	}
 
-	// Generate tokens
 	accessToken, err := GenerateAccessToken(user.ID, user.Email)
 	if err != nil {
 		return nil, errors.New("failed to generate access token")
@@ -120,7 +113,7 @@ func (as *AuthService) GetUser(userID uint) (*models.User, error) {
 	return &user, nil
 }
 
-// DTOs
+
 type RegisterRequest struct {
 	Name     string `json:"name" binding:"required,min=2,max=50"`
 	Email    string `json:"email" binding:"required,email"`

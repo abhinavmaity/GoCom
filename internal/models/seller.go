@@ -16,7 +16,6 @@ type Seller struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
-	// Relations
 	Users    []SellerUser `gorm:"foreignKey:SellerID" json:"users,omitempty"`
 	KYC      []KYC        `gorm:"foreignKey:SellerID" json:"kyc,omitempty"`
 	Products []Product    `gorm:"foreignKey:SellerID" json:"products,omitempty"`
@@ -29,12 +28,11 @@ type SellerUser struct {
 	Role     string `json:"role"` // owner, manager, staff
 	Status   int `gorm:"default:1" json:"status"` // 1=active, 0=inactive
 
-	// Relations
 	Seller Seller `gorm:"foreignKey:SellerID" json:"seller,omitempty"`
 	User   User   `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
-// Seller status constants
+
 const (
 	SellerStatusPending = iota
 	SellerStatusApproved

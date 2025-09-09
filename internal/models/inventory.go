@@ -14,6 +14,5 @@ type Inventory struct {
     CreatedAt  time.Time `json:"created_at"`
     UpdatedAt  time.Time `json:"updated_at"`
     
-    // Relations
     SKU SKU `gorm:"foreignKey:SKUID" json:"sku,omitempty"`
 }

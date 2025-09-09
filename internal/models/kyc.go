@@ -12,7 +12,7 @@ type KYC struct {
     Status      int       `gorm:"default:0" json:"status"`
     Remarks     string    `json:"remarks"`
     CreatedAt   time.Time `json:"created_at"`
+    UpdatedAt   time.Time `json:"updated_at"`
     
-    // Relations
     Seller Seller `gorm:"foreignKey:SellerID" json:"seller,omitempty"`
 }

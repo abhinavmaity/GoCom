@@ -18,8 +18,6 @@ func NewInventoryHandler() *InventoryHandler {
 	}
 }
 
-// Get inventory for SKU
-// GET /skus/:id/inventory
 func (ih *InventoryHandler) GetInventory(c *gin.Context) {
 	skuID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -39,8 +37,6 @@ func (ih *InventoryHandler) GetInventory(c *gin.Context) {
 	})
 }
 
-// Update inventory
-// PATCH /skus/:id/inventory
 func (ih *InventoryHandler) UpdateInventory(c *gin.Context) {
 	skuID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -70,8 +66,6 @@ func (ih *InventoryHandler) UpdateInventory(c *gin.Context) {
 	})
 }
 
-// Get low stock alerts for seller
-// GET /sellers/:id/inventory/alerts
 func (ih *InventoryHandler) GetLowStockAlerts(c *gin.Context) {
 	sellerID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -92,8 +86,6 @@ func (ih *InventoryHandler) GetLowStockAlerts(c *gin.Context) {
 	})
 }
 
-// Bulk inventory update
-// POST /inventory/bulk-update
 func (ih *InventoryHandler) BulkUpdateInventory(c *gin.Context) {
 	var updates []services.BulkInventoryUpdate
 	if err := c.ShouldBindJSON(&updates); err != nil {

@@ -3,7 +3,6 @@ package services
 import (
 	"errors"
 	"time"
-
 	"gorm.io/gorm"
 	"gocom/main/internal/common/db"
 	"gocom/main/internal/models"
@@ -17,15 +16,11 @@ func NewKYCService() *KYCService {
 	return &KYCService{DB: db.GetDB()}
 }
 
-// Upload KYC document
 func (ks *KYCService) UploadKYC(sellerID uint, req *UploadKYCRequest) (*models.KYC, error) {
-	// Verify seller exists
 	var seller models.Seller
 	if err := ks.DB.First(&seller, sellerID).Error; err != nil {
 		return nil, errors.New("seller not found")
 	}
-
-	// Check if document type already exists
 	var existing models.KYC
 	if err := ks.DB.Where("seller_id = ? AND type = ?", sellerID, req.Type).
 		First(&existing).Error; err == nil {
@@ -47,7 +42,7 @@ func (ks *KYCService) UploadKYC(sellerID uint, req *UploadKYCRequest) (*models.K
 	return kyc, nil
 }
 
-// Get all KYC documents for seller
+
 func (ks *KYCService) GetKYCDocuments(sellerID uint) ([]KYCResponse, error) {
 	var documents []models.KYC
 	if err := ks.DB.Where("seller_id = ?", sellerID).
@@ -71,7 +66,7 @@ func (ks *KYCService) GetKYCDocuments(sellerID uint) ([]KYCResponse, error) {
 	return response, nil
 }
 
-// Get specific KYC document
+
 func (ks *KYCService) GetKYCDocument(sellerID, docID uint) (*KYCResponse, error) {
 	var document models.KYC
 	if err := ks.DB.Where("id = ? AND seller_id = ?", docID, sellerID).
@@ -92,7 +87,7 @@ func (ks *KYCService) GetKYCDocument(sellerID, docID uint) (*KYCResponse, error)
 	return response, nil
 }
 
-// Delete KYC document
+
 func (ks *KYCService) DeleteKYC(sellerID, docID uint) error {
 	result := ks.DB.Where("id = ? AND seller_id = ?", docID, sellerID).
 		Delete(&models.KYC{})
@@ -121,14 +116,14 @@ func (ks *KYCService) getStatusText(status int) string {
 	}
 }
 
-// DTOs
+
 type UploadKYCRequest struct {
-	Type        string `json:"type" binding:"required"`        // PAN, GSTIN, etc.
-	DocumentURL string `json:"document_url" binding:"required"` // MinIO/S3 URL
+	Type        string `json:"type" binding:"required"`       
+	DocumentURL string `json:"document_url" binding:"required"`
 }
 
 type KYCResponse struct {
-    ID          uint      `json:"id"`           // Was getting null
+    ID          uint      `json:"id"`          
     Type        string    `json:"type"`
     DocumentURL string    `json:"document_url"`
     Status      int       `json:"status"`

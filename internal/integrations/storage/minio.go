@@ -101,7 +101,6 @@ func DeleteFile(bucketName, objectName string) error {
     return nil
 }
 
-// ListFiles lists all files in a bucket with prefix
 func ListFiles(bucketName, prefix string) ([]minio.ObjectInfo, error) {
     ctx := context.Background()
     

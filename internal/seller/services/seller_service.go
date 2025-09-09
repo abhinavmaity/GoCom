@@ -19,26 +19,22 @@ func NewSellerService() *SellerService {
 	}
 }
 
-// Register new seller
 func (ss *SellerService) CreateSeller(userID uint, req *CreateSellerRequest) (*models.Seller, error) {
-	// Check if user already has a seller account
 	var existingSeller models.Seller
 	if err := ss.DB.Where("legal_name = ? OR pan = ?", req.LegalName, req.PAN).First(&existingSeller).Error; err == nil {
 		return nil, errors.New("seller with this name or PAN already exists")
 	}
 
-	// Create seller
 	seller := &models.Seller{
 		LegalName:   req.LegalName,
 		DisplayName: req.DisplayName,
 		GSTIN:       req.GSTIN,
 		PAN:         req.PAN,
 		BankRef:     req.BankRef,
-		Status:      0, // Pending approval
+		Status:      0, 
 		RiskScore:   ss.calculateRiskScore(req),
 	}
 
-	// Begin transaction
 	tx := ss.DB.Begin()
 	defer func() {
 		if r := recover(); r != nil {
@@ -46,13 +42,11 @@ func (ss *SellerService) CreateSeller(userID uint, req *CreateSellerRequest) (*m
 		}
 	}()
 
-	// Save seller
 	if err := tx.Create(seller).Error; err != nil {
 		tx.Rollback()
 		return nil, err
 	}
 
-	// Create seller-user mapping
 	sellerUser := &models.SellerUser{
 		SellerID: seller.ID,
 		UserID:   userID,
@@ -65,7 +59,6 @@ func (ss *SellerService) CreateSeller(userID uint, req *CreateSellerRequest) (*m
 		return nil, err
 	}
 
-	// Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		return nil, err
 	}
@@ -73,9 +66,8 @@ func (ss *SellerService) CreateSeller(userID uint, req *CreateSellerRequest) (*m
 	return seller, nil
 }
 
-// Get seller by ID
+
 func (ss *SellerService) GetSeller(sellerID, userID uint) (*SellerResponse, error) {
-	// Verify user has access to this seller
 	if !ss.hasSellerAccess(userID, sellerID) {
 		return nil, errors.New("unauthorized access to seller")
 	}
@@ -85,13 +77,11 @@ func (ss *SellerService) GetSeller(sellerID, userID uint) (*SellerResponse, erro
 		return nil, err
 	}
 
-	// Get KYC status
 	var kycCount int64
 	var approvedKycCount int64
 	ss.DB.Model(&models.KYC{}).Where("seller_id = ?", sellerID).Count(&kycCount)
 	ss.DB.Model(&models.KYC{}).Where("seller_id = ? AND status = 1", sellerID).Count(&approvedKycCount)
 
-	// Get product count
 	var productCount int64
 	ss.DB.Model(&models.Product{}).Where("seller_id = ?", sellerID).Count(&productCount)
 
@@ -114,9 +104,7 @@ func (ss *SellerService) GetSeller(sellerID, userID uint) (*SellerResponse, erro
 	}, nil
 }
 
-// Update seller profile
 func (ss *SellerService) UpdateSeller(sellerID, userID uint, req *UpdateSellerRequest) (*models.Seller, error) {
-	// Verify user has access
 	if !ss.hasSellerAccess(userID, sellerID) {
 		return nil, errors.New("unauthorized access to seller")
 	}
@@ -126,7 +114,6 @@ func (ss *SellerService) UpdateSeller(sellerID, userID uint, req *UpdateSellerRe
 		return nil, err
 	}
 
-	// Update fields
 	if req.DisplayName != nil {
 		seller.DisplayName = *req.DisplayName
 	}
@@ -136,8 +123,6 @@ func (ss *SellerService) UpdateSeller(sellerID, userID uint, req *UpdateSellerRe
 	if req.BankRef != nil {
 		seller.BankRef = *req.BankRef
 	}
-
-	// Save changes
 	if err := ss.DB.Save(&seller).Error; err != nil {
 		return nil, err
 	}
@@ -145,7 +130,6 @@ func (ss *SellerService) UpdateSeller(sellerID, userID uint, req *UpdateSellerRe
 	return &seller, nil
 }
 
-// Check if user has access to seller
 func (ss *SellerService) hasSellerAccess(userID, sellerID uint) bool {
 	var count int64
 	ss.DB.Model(&models.SellerUser{}).
@@ -154,11 +138,8 @@ func (ss *SellerService) hasSellerAccess(userID, sellerID uint) bool {
 	return count > 0
 }
 
-// Calculate risk score based on provided information
 func (ss *SellerService) calculateRiskScore(req *CreateSellerRequest) int {
-	score := 100 // Start with perfect score
-
-	// Reduce score for missing information
+	score := 100 
 	if req.GSTIN == "" {
 		score -= 20
 	}
@@ -168,8 +149,6 @@ func (ss *SellerService) calculateRiskScore(req *CreateSellerRequest) int {
 	if req.DisplayName == "" {
 		score -= 10
 	}
-
-	// Basic validation checks
 	if len(req.PAN) != 10 {
 		score -= 25
 	}
@@ -181,11 +160,8 @@ func (ss *SellerService) calculateRiskScore(req *CreateSellerRequest) int {
 	return score
 }
 
-// Calculate profile completion rate
 func (ss *SellerService) calculateCompletionRate(seller *models.Seller, approvedKYC int) int {
 	completion := 0
-
-	// Basic info (40%)
 	if seller.LegalName != "" {
 		completion += 10
 	}
@@ -199,14 +175,12 @@ func (ss *SellerService) calculateCompletionRate(seller *models.Seller, approved
 		completion += 10
 	}
 
-	// KYC completion (40%)
-	if approvedKYC >= 2 { // Assuming minimum 2 KYC docs needed
+	if approvedKYC >= 2 { 
 		completion += 40
 	} else if approvedKYC >= 1 {
 		completion += 20
 	}
 
-	// Bank details (20%)
 	if seller.BankRef != "" {
 		completion += 20
 	}
@@ -214,7 +188,7 @@ func (ss *SellerService) calculateCompletionRate(seller *models.Seller, approved
 	return completion
 }
 
-// Request/Response DTOs
+
 type CreateSellerRequest struct {
 	LegalName   string `json:"legal_name" binding:"required,min=3,max=100"`
 	DisplayName string `json:"display_name" binding:"max=50"`

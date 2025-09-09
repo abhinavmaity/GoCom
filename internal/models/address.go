@@ -15,8 +15,8 @@ type Address struct {
     Country  string `gorm:"not null" json:"country"`
     Pin      string `gorm:"not null" json:"pin"`
     CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
     
-    // Relations
     User   User   `gorm:"foreignKey:UserID" json:"user,omitempty"`
     Seller Seller `gorm:"foreignKey:SellerID" json:"seller,omitempty"`
 }

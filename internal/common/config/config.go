@@ -87,11 +87,11 @@ func LoadConfig() {
 		LogLevel: getEnv("LOG_LEVEL", "info"),
 	}
 
-	log.Printf("✅ Configuration loaded successfully")
-	log.Printf("📦 Database: %s:%s/%s", AppConfig.DBHost, AppConfig.DBPort, AppConfig.DBName)
-	log.Printf("🔴 Redis: %s:%s", AppConfig.RedisHost, AppConfig.RedisPort)
-	log.Printf("📁 MinIO: %s", AppConfig.MinIOEndpoint)
-	log.Printf("🚀 Server will run on port: %s", AppConfig.ServerPort)
+	log.Printf("Configuration loaded successfully")
+	log.Printf("Database: %s:%s/%s", AppConfig.DBHost, AppConfig.DBPort, AppConfig.DBName)
+	log.Printf("Redis: %s:%s", AppConfig.RedisHost, AppConfig.RedisPort)
+	log.Printf("MinIO: %s", AppConfig.MinIOEndpoint)
+	log.Printf("Server will run on port: %s", AppConfig.ServerPort)
 }
 
 func getEnv(key, defaultValue string) string {

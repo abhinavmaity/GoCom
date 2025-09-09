@@ -2,10 +2,6 @@ package models
 
 import (
     "time"
-    /*
-    "encoding/json"
-    "github.com/shopspring/decimal"
-    */
 )
 
 type Product struct {
@@ -20,14 +16,12 @@ type Product struct {
     CreatedAt   time.Time       `json:"created_at"`
     UpdatedAt   time.Time       `json:"updated_at"`
     
-    // Relations
     Category    Category        `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
     Seller      Seller          `gorm:"foreignKey:SellerID" json:"seller,omitempty"`
     SKUs        []SKU           `gorm:"foreignKey:ProductID" json:"skus,omitempty"`
     Media       []Media         `gorm:"polymorphic:Entity" json:"media,omitempty"`
 }
 
-// Product status constants
 const (
     ProductStatusDraft = iota
     ProductStatusPublished

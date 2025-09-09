@@ -13,4 +13,5 @@ type Media struct {
     Alt        string `json:"alt"`
     SortOrder  int    `gorm:"default:0" json:"sort_order"`
     CreatedAt  time.Time `json:"created_at"`
+    UpdatedAt       time.Time       `json:"updated_at"`
 }

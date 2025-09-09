@@ -17,13 +17,12 @@ type SKU struct {
     Barcode    string          `json:"barcode"`
     IsActive   bool            `gorm:"default:true" json:"is_active"`
     CreatedAt  time.Time       `json:"created_at"`
-    
-    // Relations  
+
     Product    Product         `gorm:"foreignKey:ProductID" json:"product,omitempty"`
     Inventory  []Inventory     `gorm:"foreignKey:SKUID" json:"inventory,omitempty"`
 }
 
-// SKU attribute helper
+
 type SKUAttributes struct {
     Color    string `json:"color,omitempty"`
     Size     string `json:"size,omitempty"`

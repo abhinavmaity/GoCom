@@ -1,196 +1,251 @@
 package handlers
 
 import (
-	"net/http"
-	"strconv"
+    "net/http"
+    "strconv"
 
-	"github.com/gin-gonic/gin"
-	"gocom/main/internal/seller/services"
+    "github.com/gin-gonic/gin"
+    "gocom/main/internal/common/auth"
+    "gocom/main/internal/seller/services"
+    "gocom/main/internal/models"
 )
 
 type ProductHandler struct {
-	ProductService *services.ProductService
+    ProductService *services.ProductService
 }
 
 func NewProductHandler() *ProductHandler {
-	return &ProductHandler{
-		ProductService: services.NewProductService(),
-	}
+    return &ProductHandler{
+        ProductService: services.NewProductService(),
+    }
 }
 
-// Create product
-// POST /sellers/:id/products
 func (ph *ProductHandler) CreateProduct(c *gin.Context) {
-	sellerID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid seller ID"})
-		return
-	}
+    sellerID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid seller ID"})
+        return
+    }
+    userID := auth.GetUserID(c)
+    if userID == 0 {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+        return
+    }
 
-	// TODO: Validate user owns this seller account from JWT
+    if !ph.hasSellerAccess(userID, uint(sellerID)) {
+        c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access to seller"})
+        return
+    }
 
-	var req services.CreateProductRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "validation failed",
-			"details": err.Error(),
-		})
-		return
-	}
+    var req services.CreateProductRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error":   "validation failed",
+            "details": err.Error(),
+        })
+        return
+    }
 
-	product, err := ph.ProductService.CreateProduct(uint(sellerID), &req)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    product, err := ph.ProductService.CreateProduct(uint(sellerID), &req)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
 
-	c.JSON(http.StatusCreated, gin.H{
-		"success": true,
-		"data":    product,
-		"message": "Product created successfully",
-	})
+    c.JSON(http.StatusCreated, gin.H{
+        "success": true,
+        "data":    product,
+        "message": "Product created successfully",
+    })
 }
 
-// Get product details
-// GET /products/:id
 func (ph *ProductHandler) GetProduct(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
-		return
-	}
+    productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+        return
+    }
 
-	product, err := ph.ProductService.GetProduct(uint(productID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
+    product, err := ph.ProductService.GetProduct(uint(productID))
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    product,
-	})
+    c.JSON(http.StatusOK, gin.H{
+        "success": true,
+        "data":    product,
+    })
 }
 
-// List seller products
-// GET /sellers/:id/products
 func (ph *ProductHandler) ListProducts(c *gin.Context) {
-	sellerID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid seller ID"})
-		return
-	}
+    sellerID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid seller ID"})
+        return
+    }
+    userID := auth.GetUserID(c)
+    if userID == 0 {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+        return
+    }
 
-	// Parse query parameters
-	filters := &services.ProductFilters{}
-	
-	if statusStr := c.Query("status"); statusStr != "" {
-		if status, err := strconv.Atoi(statusStr); err == nil {
-			filters.Status = &status
-		}
-	}
+    if !ph.hasSellerAccess(userID, uint(sellerID)) {
+        c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access to seller"})
+        return
+    }
+    filters := &services.ProductFilters{}
+    
+    if statusStr := c.Query("status"); statusStr != "" {
+        if status, err := strconv.Atoi(statusStr); err == nil {
+            filters.Status = &status
+        }
+    }
 
-	if categoryIDStr := c.Query("category_id"); categoryIDStr != "" {
-		if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
-			categoryIDUint := uint(categoryID)
-			filters.CategoryID = &categoryIDUint
-		}
-	}
+    if categoryIDStr := c.Query("category_id"); categoryIDStr != "" {
+        if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
+            categoryIDUint := uint(categoryID)
+            filters.CategoryID = &categoryIDUint
+        }
+    }
 
-	filters.Search = c.Query("search")
+    filters.Search = c.Query("search")
 
-	products, err := ph.ProductService.ListProducts(uint(sellerID), filters)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+    products, err := ph.ProductService.ListProducts(uint(sellerID), filters)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    products,
-		"count":   len(products),
-	})
+    c.JSON(http.StatusOK, gin.H{
+        "success": true,
+        "data":    products,
+        "count":   len(products),
+    })
 }
 
-// Update product
-// PATCH /products/:id
 func (ph *ProductHandler) UpdateProduct(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
-		return
-	}
+    productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+        return
+    }
+    var product models.Product
+    if err := ph.ProductService.DB.First(&product, productID).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+        return
+    }
 
-	// TODO: Get seller ID from JWT
-	sellerID := uint(1) // Placeholder
+    sellerID := product.SellerID
+    userID := auth.GetUserID(c)
+    if userID == 0 {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+        return
+    }
 
-	var req services.UpdateProductRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "validation failed",
-			"details": err.Error(),
-		})
-		return
-	}
+    if !ph.hasSellerAccess(userID, sellerID) {
+        c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access to seller"})
+        return
+    }
 
-	product, err := ph.ProductService.UpdateProduct(uint(productID), sellerID, &req)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    var req services.UpdateProductRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error":   "validation failed",
+            "details": err.Error(),
+        })
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    product,
-		"message": "Product updated successfully",
-	})
+    updatedProduct, err := ph.ProductService.UpdateProduct(uint(productID), sellerID, &req)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "success": true,
+        "data":    updatedProduct,
+        "message": "Product updated successfully",
+    })
 }
 
-// Delete product
-// DELETE /products/:id
 func (ph *ProductHandler) DeleteProduct(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
-		return
-	}
+    productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+        return
+    }
+    var product models.Product
+    if err := ph.ProductService.DB.First(&product, productID).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+        return
+    }
 
-	// TODO: Get seller ID from JWT
-	sellerID := uint(1) // Placeholder
+    sellerID := product.SellerID
+    userID := auth.GetUserID(c)
+    if userID == 0 {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+        return
+    }
 
-	if err := ph.ProductService.DeleteProduct(uint(productID), sellerID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    if !ph.hasSellerAccess(userID, sellerID) {
+        c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access to seller"})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Product deleted successfully",
-	})
+    if err := ph.ProductService.DeleteProduct(uint(productID), sellerID); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "success": true,
+        "message": "Product deleted successfully",
+    })
 }
 
-// Publish product
-// POST /products/:id/publish
 func (ph *ProductHandler) PublishProduct(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
-		return
-	}
+    productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+        return
+    }
+    var product models.Product
+    if err := ph.ProductService.DB.First(&product, productID).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+        return
+    }
 
-	// TODO: Get seller ID from JWT
-	sellerID := uint(1) // Placeholder
+    sellerID := product.SellerID
+    userID := auth.GetUserID(c)
+    if userID == 0 {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+        return
+    }
 
-	product, err := ph.ProductService.PublishProduct(uint(productID), sellerID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    if !ph.hasSellerAccess(userID, sellerID) {
+        c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized access to seller"})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    product,
-		"message": "Product published successfully",
-	})
+    publishedProduct, err := ph.ProductService.PublishProduct(uint(productID), sellerID)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "success": true,
+        "data":    publishedProduct,
+        "message": "Product published successfully",
+    })
 }
 
+func (ph *ProductHandler) hasSellerAccess(userID, sellerID uint) bool {
+    var count int64
+    ph.ProductService.DB.Model(&models.SellerUser{}).
+        Where("user_id = ? AND seller_id = ? AND status = 1", userID, sellerID).
+        Count(&count)
+    return count > 0
+}

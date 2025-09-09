@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 	"encoding/json"
-
 	"gorm.io/gorm"
 	"gocom/main/internal/common/db"
 	"gocom/main/internal/models"
@@ -22,38 +21,30 @@ func NewSKUService() *SKUService {
 	}
 }
 
-// Add SKU to product
 func (ss *SKUService) CreateSKU(productID uint, req *CreateSKURequest) (*models.SKU, error) {
-	// Verify product exists and get seller ID for authorization
 	var product models.Product
 	if err := ss.DB.First(&product, productID).Error; err != nil {
 		return nil, errors.New("product not found")
 	}
-
-	// Generate unique SKU code if not provided
 	skuCode := req.SKUCode
 	if skuCode == "" {
 		skuCode = ss.generateSKUCode(product.ID)
 	}
 
-	// Check SKU code uniqueness
 	var existingSKU models.SKU
 	if err := ss.DB.Where("sku_code = ?", skuCode).First(&existingSKU).Error; err == nil {
 		return nil, errors.New("SKU code already exists")
 	}
 
-	// Validate pricing
 	if req.PriceSell.GreaterThan(req.PriceMRP) {
 		return nil, errors.New("selling price cannot be greater than MRP")
 	}
 
-	// Convert attributes to JSON
 	attributesJSON, err := json.Marshal(req.Attributes)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create SKU
 	sku := &models.SKU{
 		ProductID:  productID,
 		SKUCode:    skuCode,
@@ -68,10 +59,9 @@ func (ss *SKUService) CreateSKU(productID uint, req *CreateSKURequest) (*models.
 		return nil, err
 	}
 
-	// Create initial inventory record
 	inventory := &models.Inventory{
 		SKUID:      sku.ID,
-		LocationID: 1, // Default location
+		LocationID: 1, 
 		OnHand:     0,
 		Reserved:   0,
 		Threshold:  req.Threshold,
@@ -82,7 +72,7 @@ func (ss *SKUService) CreateSKU(productID uint, req *CreateSKURequest) (*models.
 	return sku, nil
 }
 
-// Get all SKUs for a product
+
 func (ss *SKUService) GetProductSKUs(productID uint) ([]SKUResponse, error) {
 	var skus []models.SKU
 	err := ss.DB.Where("product_id = ?", productID).Find(&skus).Error
@@ -92,11 +82,8 @@ func (ss *SKUService) GetProductSKUs(productID uint) ([]SKUResponse, error) {
 
 	var response []SKUResponse
 	for _, sku := range skus {
-		// Get inventory info
 		var inventory models.Inventory
-		ss.DB.Where("sku_id = ?", sku.ID).First(&inventory)
-
-		// Parse attributes
+		ss.DB.Where("sk_uid = ?", sku.ID).First(&inventory)
 		var attributes map[string]interface{}
 		json.Unmarshal(sku.Attributes, &attributes)
 
@@ -123,14 +110,12 @@ func (ss *SKUService) GetProductSKUs(productID uint) ([]SKUResponse, error) {
 	return response, nil
 }
 
-// Update SKU
+
 func (ss *SKUService) UpdateSKU(skuID uint, req *UpdateSKURequest) (*models.SKU, error) {
 	var sku models.SKU
 	if err := ss.DB.First(&sku, skuID).Error; err != nil {
 		return nil, errors.New("SKU not found")
 	}
-
-	// Update fields if provided
 	if req.Attributes != nil {
 		attributesJSON, _ := json.Marshal(req.Attributes)
 		sku.Attributes = attributesJSON
@@ -139,7 +124,6 @@ func (ss *SKUService) UpdateSKU(skuID uint, req *UpdateSKURequest) (*models.SKU,
 		sku.PriceMRP = *req.PriceMRP
 	}
 	if req.PriceSell != nil {
-		// Validate pricing
 		if req.PriceSell.GreaterThan(sku.PriceMRP) {
 			return nil, errors.New("selling price cannot be greater than MRP")
 		}
@@ -159,30 +143,25 @@ func (ss *SKUService) UpdateSKU(skuID uint, req *UpdateSKURequest) (*models.SKU,
 	return &sku, nil
 }
 
-// Delete SKU
+
 func (ss *SKUService) DeleteSKU(skuID uint) error {
-	// Check if SKU has pending orders
 	var orderItemCount int64
-	ss.DB.Model(&models.OrderItem{}).Where("sku_id = ?", skuID).Count(&orderItemCount)
+	ss.DB.Model(&models.OrderItem{}).Where("sk_uid = ?", skuID).Count(&orderItemCount)
 	
 	if orderItemCount > 0 {
 		return errors.New("cannot delete SKU with existing orders")
 	}
-
-	// Delete inventory first (cascade)
-	ss.DB.Where("sku_id = ?", skuID).Delete(&models.Inventory{})
-
-	// Delete SKU
+	ss.DB.Where("sk_uid = ?", skuID).Delete(&models.Inventory{})
 	return ss.DB.Delete(&models.SKU{}, skuID).Error
 }
 
-// Generate unique SKU code
+
 func (ss *SKUService) generateSKUCode(productID uint) string {
 	timestamp := time.Now().Unix()
 	return fmt.Sprintf("SKU-%d-%d", productID, timestamp)
 }
 
-// Request/Response DTOs
+
 type CreateSKURequest struct {
 	SKUCode    string                 `json:"sku_code"`
 	Attributes map[string]interface{} `json:"attributes" binding:"required"`

@@ -16,8 +16,6 @@ func NewKYCHandler() *KYCHandler {
 	return &KYCHandler{KYCService: services.NewKYCService()}
 }
 
-// Upload KYC document
-// POST /sellers/:id/kyc
 func (kh *KYCHandler) UploadKYC(c *gin.Context) {
 	sellerID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 
@@ -40,8 +38,6 @@ func (kh *KYCHandler) UploadKYC(c *gin.Context) {
 	})
 }
 
-// Get KYC documents
-// GET /sellers/:id/kyc
 func (kh *KYCHandler) GetKYCDocuments(c *gin.Context) {
 	sellerID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 
@@ -58,8 +54,6 @@ func (kh *KYCHandler) GetKYCDocuments(c *gin.Context) {
 	})
 }
 
-// Get specific KYC document
-// GET /sellers/:id/kyc/:docId
 func (kh *KYCHandler) GetKYCDocument(c *gin.Context) {
 	sellerID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	docID, _ := strconv.ParseUint(c.Param("docId"), 10, 32)
@@ -73,8 +67,6 @@ func (kh *KYCHandler) GetKYCDocument(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": document})
 }
 
-// Delete KYC document
-// DELETE /sellers/:id/kyc/:docId
 func (kh *KYCHandler) DeleteKYC(c *gin.Context) {
 	sellerID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	docID, _ := strconv.ParseUint(c.Param("docId"), 10, 32)

@@ -11,7 +11,5 @@ type Shipment struct {
 	ETA       *time.Time `json:"eta,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
-	
-	// Relations
 	Order Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 }
