@@ -92,7 +92,7 @@ func (ps *ProductService) ListProducts(sellerID uint, filters *ProductFilters) (
 			query = query.Where("category_id = ?", *filters.CategoryID)
 		}
 		if filters.Search != "" {
-			query = query.Where("title ILIKE ? OR brand ILIKE ?", "%"+filters.Search+"%", "%"+filters.Search+"%")
+            query = query.Where("title LIKE ? OR brand LIKE ?", "%"+filters.Search+"%", "%"+filters.Search+"%")
 		}
 	}
 

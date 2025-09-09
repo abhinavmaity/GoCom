@@ -26,18 +26,19 @@ type Order struct {
 }
 
 type OrderItem struct {
-	ID         uint            `gorm:"primaryKey" json:"id"`
-	OrderID    uint            `gorm:"not null" json:"order_id"`
-	SKUID      uint            `gorm:"not null" json:"sku_id"`
-	Qty        int             `gorm:"not null" json:"quantity"`
-	Price      decimal.Decimal `gorm:"type:decimal(10,2)" json:"price"`
-	Tax        decimal.Decimal `gorm:"type:decimal(10,2)" json:"tax"`
-	SellerID   uint            `gorm:"not null" json:"seller_id"`
-	ShipmentID *uint           `json:"shipment_id,omitempty"`
-	
-	// Relations
-	Order    Order     `gorm:"foreignKey:OrderID" json:"order,omitempty"`
-	SKU      SKU       `gorm:"foreignKey:SKUID" json:"sku,omitempty"`
-	Seller   Seller    `gorm:"foreignKey:SellerID" json:"seller,omitempty"`
-	Shipment *Shipment `gorm:"foreignKey:ShipmentID" json:"shipment,omitempty"`
+    ID         uint            `gorm:"primaryKey" json:"id"`
+    OrderID    uint            `gorm:"not null" json:"order_id"`
+    SKUID      uint            `gorm:"column:sku_id;not null" json:"sku_id"` // ✅ Explicit column name
+    Qty        int             `gorm:"not null" json:"quantity"`
+    Price      decimal.Decimal `gorm:"type:decimal(10,2)" json:"price"`
+    Tax        decimal.Decimal `gorm:"type:decimal(10,2)" json:"tax"`
+    SellerID   uint            `gorm:"not null" json:"seller_id"`
+    ShipmentID *uint           `json:"shipment_id,omitempty"`
+    
+    // Relations
+    Order    Order     `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+    SKU      SKU       `gorm:"foreignKey:SKUID" json:"sku,omitempty"`
+    Seller   Seller    `gorm:"foreignKey:SellerID" json:"seller,omitempty"`
+    Shipment *Shipment `gorm:"foreignKey:ShipmentID" json:"shipment,omitempty"`
 }
+

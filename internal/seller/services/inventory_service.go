@@ -22,7 +22,7 @@ func NewInventoryService() *InventoryService {
 // Get inventory for SKU
 func (is *InventoryService) GetInventory(skuID uint) (*InventoryResponse, error) {
 	var inventory models.Inventory
-	if err := is.DB.Where("sku_id = ?", skuID).First(&inventory).Error; err != nil {
+	if err := is.DB.Where("sk_uid = ?", skuID).First(&inventory).Error; err != nil {
 		return nil, errors.New("inventory not found")
 	}
 

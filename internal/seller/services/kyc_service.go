@@ -128,12 +128,12 @@ type UploadKYCRequest struct {
 }
 
 type KYCResponse struct {
-	ID          uint      `json:"id"`
-	Type        string    `json:"type"`
-	DocumentURL string    `json:"document_url"`
-	Status      int       `json:"status"`
-	StatusText  string    `json:"status_text"`
-	Remarks     string    `json:"remarks"`
-	CreatedAt   time.Time `json:"created_at"`
+    ID          uint      `json:"id"`           // Was getting null
+    Type        string    `json:"type"`
+    DocumentURL string    `json:"document_url"`
+    Status      int       `json:"status"`
+    StatusText  string    `json:"status_text"`
+    Remarks     string    `json:"remarks"`
+    CreatedAt   time.Time `json:"created_at"`
 }
 
