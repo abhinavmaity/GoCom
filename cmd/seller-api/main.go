@@ -20,27 +20,47 @@ func main() {
 	db.ConnectMySQL()
 
 	// ✅ FIXED: Auto-migrate ALL models including missing ones
-	if err := db.AutoMigrate(
+	// if err := db.AutoMigrate(
+	// 	&models.User{},
+	// 	&models.Seller{},
+	// 	&models.SellerUser{},
+	// 	&models.KYC{},
+	// 	&models.Category{},
+	// 	&models.Product{},
+	// 	&models.SKU{},
+	// 	&models.Inventory{},
+	// 	&models.Media{},
+	// 	&models.Address{},
+	// 	// ✅ FIXED: Added missing models
+	// 	&models.Order{},
+	// 	&models.OrderItem{},
+	// 	&models.Payment{},
+	// 	&models.Shipment{},
+	// 	&models.Return{},
+	// 	&models.Refund{},
+	// ); err != nil {
+	// 	log.Fatal("Failed to migrate database:", err)
+	// }
+	// Auto-migrate database schemas
+	if err := db.GetDB().AutoMigrate(
 		&models.User{},
 		&models.Seller{},
 		&models.SellerUser{},
 		&models.KYC{},
-		&models.Category{},
-		&models.Product{},
 		&models.SKU{},
 		&models.Inventory{},
 		&models.Media{},
+		&models.Category{},
+		&models.Product{},
 		&models.Address{},
-		// ✅ FIXED: Added missing models
+		// 🆕 ADD THESE MISSING MODELS
 		&models.Order{},
 		&models.OrderItem{},
-		&models.Payment{},
 		&models.Shipment{},
-		&models.Return{},
-		&models.Refund{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
+
 
 	// ✅ Connect MinIO (using your existing setup)
 	storage.ConnectMinIO()

@@ -81,44 +81,47 @@ func (ps *ProductService) GetProduct(productID uint) (*ProductResponse, error) {
 
 // List products for seller
 func (ps *ProductService) ListProducts(sellerID uint, filters *ProductFilters) ([]ProductSummary, error) {
-	query := ps.DB.Model(&models.Product{}).Where("seller_id = ?", sellerID)
-
-	// Apply filters
-	if filters != nil {
-		if filters.Status != nil {
-			query = query.Where("status = ?", *filters.Status)
-		}
-		if filters.CategoryID != nil {
-			query = query.Where("category_id = ?", *filters.CategoryID)
-		}
-		if filters.Search != "" {
+    query := ps.DB.Model(&models.Product{}).Where("seller_id = ?", sellerID)
+    
+    // Apply filters
+    if filters != nil {
+        if filters.Status != nil {
+            query = query.Where("status = ?", *filters.Status)
+        }
+        
+        if filters.CategoryID != nil {
+            query = query.Where("category_id = ?", *filters.CategoryID)
+        }
+        
+        if filters.Search != "" {
+            // 🔧 FIX: Use LIKE instead of ILIKE for MySQL compatibility
             query = query.Where("title LIKE ? OR brand LIKE ?", "%"+filters.Search+"%", "%"+filters.Search+"%")
-		}
-	}
+        }
+    }
 
-	var products []models.Product
-	if err := query.Find(&products).Error; err != nil {
-		return nil, err
-	}
+    var products []models.Product
+    if err := query.Order("created_at DESC").Find(&products).Error; err != nil {
+        return nil, err
+    }
 
-	var summary []ProductSummary
-	for _, product := range products {
-		// Get SKU count for each product
-		var skuCount int64
-		ps.DB.Model(&models.SKU{}).Where("product_id = ?", product.ID).Count(&skuCount)
+    var summary []ProductSummary
+    for _, product := range products {
+        // Get SKU count for each product
+        var skuCount int64
+        ps.DB.Model(&models.SKU{}).Where("product_id = ?", product.ID).Count(&skuCount)
+        
+        summary = append(summary, ProductSummary{
+            ID:         product.ID,
+            Title:      product.Title,
+            Brand:      product.Brand,
+            Status:     product.Status,
+            StatusText: ps.getStatusText(product.Status),
+            SKUCount:   int(skuCount),
+            CreatedAt:  product.CreatedAt,
+        })
+    }
 
-		summary = append(summary, ProductSummary{
-			ID:         product.ID,
-			Title:      product.Title,
-			Brand:      product.Brand,
-			Status:     product.Status,
-			StatusText: ps.getStatusText(product.Status),
-			SKUCount:   int(skuCount),
-			CreatedAt:  product.CreatedAt,
-		})
-	}
-
-	return summary, nil
+    return summary, nil
 }
 
 // Update product

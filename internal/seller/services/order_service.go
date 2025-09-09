@@ -17,57 +17,16 @@ func NewOrderService() *OrderService {
 	return &OrderService{DB: db.GetDB()}
 }
 
-// ✅ FIXED: Correct method signature (only sellerID needed)
-// func (os *OrderService) GetSellerOrders(sellerID uint) ([]OrderResponse, error) {
-// 	var orders []models.Order
-	
-// 	// Get orders where seller has items using GORM joins
-// 	err := os.DB.
-// 		Joins("JOIN order_items oi ON orders.id = oi.order_id").
-// 		Where("oi.seller_id = ?", sellerID).
-// 		Group("orders.id").
-// 		Order("orders.created_at DESC").
-// 		Find(&orders).Error
-	
-// 	if err != nil {
-// 		return nil, err
-// 	}
 
-// 	var response []OrderResponse
-// 	for _, order := range orders {
-// 		// Get item count for this order and seller
-// 		var itemCount int64
-// 		os.DB.Model(&models.OrderItem{}).
-// 			Where("order_id = ? AND seller_id = ?", order.ID, sellerID).
-// 			Count(&itemCount)
-		
-// 		response = append(response, OrderResponse{
-// 			ID:            order.ID,
-// 			UserID:        order.UserID,
-// 			Total:         order.Total,
-// 			Tax:           order.Tax,
-// 			Shipping:      order.Shipping,
-// 			Status:        order.Status,
-// 			StatusText:    GetStatusText(order.Status),
-// 			PaymentStatus: order.PaymentStatus,
-// 			ItemCount:     int(itemCount),
-// 			CreatedAt:     order.CreatedAt,
-// 			UpdatedAt:     order.UpdatedAt,
-// 		})
-// 	}
-
-// 	return response, nil
-// }
-
-
+// Add wrapper method for handler compatibility
 func (os *OrderService) GetSellerOrders(sellerID uint) ([]OrderResponse, error) {
     // Default pagination values
     return os.GetSellerOrdersPaginated(sellerID, 1, 50)
 }
 
-// Rename existing method for clarity
+// Rename existing method
 func (os *OrderService) GetSellerOrdersPaginated(sellerID uint, page, limit int) ([]OrderResponse, error) {
-    // Your existing implementation
+    // Your existing implementation...
     var orders []models.Order
     offset := (page - 1) * limit
     
@@ -84,7 +43,7 @@ func (os *OrderService) GetSellerOrdersPaginated(sellerID uint, page, limit int)
         return nil, err
     }
 
-    // Convert to response format
+    // Convert to response format...
     var response []OrderResponse
     for _, order := range orders {
         var itemCount int64
@@ -106,10 +65,42 @@ func (os *OrderService) GetSellerOrdersPaginated(sellerID uint, page, limit int)
             UpdatedAt:     order.UpdatedAt,
         })
     }
-
     return response, nil
 }
 
+// Fix ShipOrder method signature
+func (os *OrderService) ShipOrder(orderID, sellerID uint, provider, awb string) error {
+    // Verify seller owns this order
+    var count int64
+    os.DB.Model(&models.OrderItem{}).
+        Where("order_id = ? AND seller_id = ?", orderID, sellerID).
+        Count(&count)
+        
+    if count == 0 {
+        return errors.New("order not found or unauthorized")
+    }
+
+    // Create shipment record
+    shipment := &models.Shipment{
+        OrderID:   orderID,
+        Provider:  provider,
+        AWB:       awb,
+        Status:    1, // Shipped
+        CreatedAt: time.Now(),
+    }
+
+    if err := os.DB.Create(shipment).Error; err != nil {
+        return err
+    }
+
+    // Update order status to shipped
+    return os.DB.Model(&models.Order{}).
+        Where("id = ?", orderID).
+        Updates(map[string]interface{}{
+            "status":     2, // Shipped
+            "updated_at": time.Now(),
+        }).Error
+}
 
 // ✅ FIXED: Correct method signature
 func (os *OrderService) GetOrderDetails(orderID, sellerID uint) (*OrderDetailResponse, error) {
@@ -169,41 +160,6 @@ func (os *OrderService) GetOrderDetails(orderID, sellerID uint) (*OrderDetailRes
 	return response, nil
 }
 
-// ✅ FIXED: Simple internal shipping (no Shiprocket)
-// Update method to accept individual parameters (like handler sends)
-// Fix ShipOrder method to match handler usage
-func (os *OrderService) ShipOrder(orderID, sellerID uint, provider, awb string) error {
-    // Verify seller owns this order
-    var count int64
-    os.DB.Model(&models.OrderItem{}).
-        Where("order_id = ? AND seller_id = ?", orderID, sellerID).
-        Count(&count)
-        
-    if count == 0 {
-        return errors.New("order not found or unauthorized")
-    }
-
-    // Create shipment record
-    shipment := &models.Shipment{
-        OrderID:   orderID,
-        Provider:  provider,
-        AWB:       awb,
-        Status:    1, // Shipped
-        CreatedAt: time.Now(),
-    }
-
-    if err := os.DB.Create(shipment).Error; err != nil {
-        return err
-    }
-
-    // Update order status to shipped
-    return os.DB.Model(&models.Order{}).
-        Where("id = ?", orderID).
-        Updates(map[string]interface{}{
-            "status":     2, // Shipped
-            "updated_at": time.Now(),
-        }).Error
-}
 
 
 func (os *OrderService) UpdateOrderStatus(orderID, sellerID uint, newStatus int) error {
