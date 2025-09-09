@@ -2,73 +2,70 @@ package seller
 
 import (
 	"github.com/gin-gonic/gin"
+	"gocom/main/internal/common/auth"
 	"gocom/main/internal/seller/handlers"
 )
 
 func SetupRoutes(r *gin.Engine) {
 	// Initialize all handlers
-	sellerHandler := handlers.NewSellerHandler()       // Phase 2
-	
-
-	kycHandler := handlers.NewKYCHandler()             // Phase 3  
-	
-
-	productHandler := handlers.NewProductHandler()     // Phase 4
-	skuHandler := handlers.NewSKUHandler()             // Phase 5
-	inventoryHandler := handlers.NewInventoryHandler() // Phase 6
-	addressHandler := handlers.NewAddressHandler()     // Phase 7
-	// orderHandler := handlers.NewOrderHandler()      // Phase 8 - TODO
+	sellerHandler := handlers.NewSellerHandler()
+	kycHandler := handlers.NewKYCHandler()
+	productHandler := handlers.NewProductHandler()
+	skuHandler := handlers.NewSKUHandler()
+	inventoryHandler := handlers.NewInventoryHandler()
+	addressHandler := handlers.NewAddressHandler()
+	orderHandler := handlers.NewOrderHandler() // ✅ FIXED: Uncommented!
 
 	// API v1 group
 	v1 := r.Group("/v1")
 
-	// Phase 2: Seller Core routes
-	{
-		v1.POST("/sellers", sellerHandler.CreateSeller)
-		v1.GET("/sellers/:id", sellerHandler.GetSeller)
-		v1.PATCH("/sellers/:id", sellerHandler.UpdateSeller)
-	}
+	// ✅ Public seller routes (no auth needed for registration)
+	v1.POST("/sellers", sellerHandler.CreateSeller)
 
-	// Phase 3: KYC Management routes
+	// ✅ Protected routes (require JWT)
+	protected := v1.Group("")
+	protected.Use(auth.JWTAuthMiddleware())
 	{
-		v1.POST("/sellers/:id/kyc", kycHandler.UploadKYC)
-		v1.GET("/sellers/:id/kyc", kycHandler.GetKYCDocuments)
-		v1.GET("/sellers/:id/kyc/:docId", kycHandler.GetKYCDocument)
-		v1.DELETE("/sellers/:id/kyc/:docId", kycHandler.DeleteKYC)
-	}
+		// Seller Core routes
+		protected.GET("/sellers/:id", sellerHandler.GetSeller)
+		protected.PATCH("/sellers/:id", sellerHandler.UpdateSeller)
 
-	// Phase 4: Product Catalog routes
-	{
-		v1.POST("/sellers/:id/products", productHandler.CreateProduct)
-		v1.GET("/sellers/:id/products", productHandler.ListProducts)
-		v1.GET("/products/:id", productHandler.GetProduct)
-		v1.PATCH("/products/:id", productHandler.UpdateProduct)
-		v1.DELETE("/products/:id", productHandler.DeleteProduct)
-		v1.POST("/products/:id/publish", productHandler.PublishProduct)
-	}
+		// KYC Management routes
+		protected.POST("/sellers/:id/kyc", kycHandler.UploadKYC)
+		protected.GET("/sellers/:id/kyc", kycHandler.GetKYCDocuments)
+		protected.GET("/sellers/:id/kyc/:docId", kycHandler.GetKYCDocument)
+		protected.DELETE("/sellers/:id/kyc/:docId", kycHandler.DeleteKYC)
 
-	// Phase 5: SKU & Variants routes
-	{
-		v1.POST("/products/:id/skus", skuHandler.CreateSKU)
-		v1.GET("/products/:id/skus", skuHandler.GetProductSKUs)
-		v1.PATCH("/skus/:id", skuHandler.UpdateSKU)
-		v1.DELETE("/skus/:id", skuHandler.DeleteSKU)
-	}
+		// Product Catalog routes
+		protected.POST("/sellers/:id/products", productHandler.CreateProduct)
+		protected.GET("/sellers/:id/products", productHandler.ListProducts)
+		protected.GET("/products/:id", productHandler.GetProduct)
+		protected.PATCH("/products/:id", productHandler.UpdateProduct)
+		protected.DELETE("/products/:id", productHandler.DeleteProduct)
+		protected.POST("/products/:id/publish", productHandler.PublishProduct)
 
-	// Phase 6: Inventory Management routes
-	{
-		v1.GET("/skus/:id/inventory", inventoryHandler.GetInventory)
-		v1.PATCH("/skus/:id/inventory", inventoryHandler.UpdateInventory)
-		v1.GET("/sellers/:id/inventory/alerts", inventoryHandler.GetLowStockAlerts)
-		v1.POST("/inventory/bulk-update", inventoryHandler.BulkUpdateInventory)
-	}
+		// SKU & Variants routes
+		protected.POST("/products/:id/skus", skuHandler.CreateSKU)
+		protected.GET("/products/:id/skus", skuHandler.GetProductSKUs)
+		protected.PATCH("/skus/:id", skuHandler.UpdateSKU)
+		protected.DELETE("/skus/:id", skuHandler.DeleteSKU)
 
-	// Phase 7: Address Management routes
-	{
-		v1.POST("/sellers/:id/addresses", addressHandler.AddAddress)
-		v1.GET("/sellers/:id/addresses", addressHandler.GetSellerAddresses)
-		v1.PATCH("/addresses/:id", addressHandler.UpdateAddress)
-		v1.DELETE("/addresses/:id", addressHandler.DeleteAddress)
+		// Inventory Management routes
+		protected.GET("/skus/:id/inventory", inventoryHandler.GetInventory)
+		protected.PATCH("/skus/:id/inventory", inventoryHandler.UpdateInventory)
+		protected.GET("/sellers/:id/inventory/alerts", inventoryHandler.GetLowStockAlerts)
+		protected.POST("/inventory/bulk-update", inventoryHandler.BulkUpdateInventory)
+
+		// Address Management routes
+		protected.POST("/sellers/:id/addresses", addressHandler.AddAddress)
+		protected.GET("/sellers/:id/addresses", addressHandler.GetSellerAddresses)
+		protected.PATCH("/addresses/:id", addressHandler.UpdateAddress)
+		protected.DELETE("/addresses/:id", addressHandler.DeleteAddress)
+
+		// ✅ FIXED: Order Management routes (uncommented and working)
+		protected.GET("/sellers/:id/orders", orderHandler.GetSellerOrders)
+		protected.GET("/orders/:id", orderHandler.GetOrderDetails)
+		protected.PATCH("/orders/:id/status", orderHandler.UpdateOrderStatus)
+		protected.POST("/orders/:id/ship", orderHandler.ShipOrder)
 	}
 }
-

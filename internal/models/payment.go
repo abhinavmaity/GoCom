@@ -2,17 +2,19 @@ package models
 
 import (
 	"time"
-
-	"google.golang.org/genproto/googleapis/type/decimal"
+	"github.com/shopspring/decimal"
 )
 
 type Payment struct {
-	ID        uint `gorm:"primaryKey"`
-	OrderID   uint `gorm:"not null"`
-	IntentID  string
-	Provider  string          // razorpay, payu, etc.
-	Amount    decimal.Decimal `gorm:"type:decimal(10,2)"`
-	Status    int             `gorm:"default:0"` // 0=pending, 1=captured, 2=failed
-	TxnRef    string
-	CreatedAt time.Time
+	ID        uint            `gorm:"primaryKey" json:"id"`
+	OrderID   uint            `gorm:"not null" json:"order_id"`
+	IntentID  string          `json:"intent_id"`
+	Provider  string          `json:"provider"` // razorpay, etc.
+	Amount    decimal.Decimal `gorm:"type:decimal(10,2)" json:"amount"`
+	Status    int             `gorm:"default:0" json:"status"` // 0=pending, 1=captured
+	TxnRef    string          `json:"transaction_reference"`
+	CreatedAt time.Time       `json:"created_at"`
+	
+	// Relations
+	Order Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 }
