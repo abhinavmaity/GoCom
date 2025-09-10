@@ -1,9 +1,8 @@
-// internal/marketplace/commerce/services/order_service.go
 package services
 
 import (
-	//"github.com/shopspring/decimal"
-	"gocom/main/internal/marketplace/commerce/dto"
+	"errors"
+	"github.com/shopspring/decimal"
 	"gocom/main/internal/models"
 	"gorm.io/gorm"
 )
@@ -16,104 +15,64 @@ func NewOrderService(db *gorm.DB) *OrderService {
 	return &OrderService{db: db}
 }
 
-func (s *OrderService) GetUserOrders(userID uint, page, limit int) ([]dto.OrderSummary, error) {
-	var orders []models.Order
-	offset := (page - 1) * limit
+// CreateOrderFromCart creates an order based on cart items and applies necessary data
+func (s *OrderService) CreateOrderFromCart(cartID string, addressID uint) (*models.Order, error) {
+	// Fetch cart from DB
+	var cart models.Cart
+	if err := s.db.Where("id = ?", cartID).First(&cart).Error; err != nil {
+		return nil, errors.New("cart not found")
+	}
 
-	err := s.db.Where("user_id = ?", userID).
-		Order("created_at DESC").
-		Offset(offset).
-		Limit(limit).
-		Find(&orders).Error
+	// Initialize total for order calculation
+	var totalAmount decimal.Decimal
 
-	if err != nil {
+	// Create the order from the cart
+	order := &models.Order{
+		UserID:    cart.UserID,
+		AddressID: addressID,
+		Status:    "pending", // "pending" means waiting for payment capture
+		Total:     0,         // Placeholder for now; we'll calculate the total
+	}
+
+	// Create order in the database
+	if err := s.db.Create(order).Error; err != nil {
 		return nil, err
 	}
 
-	var result []dto.OrderSummary
-	for _, order := range orders {
-		result = append(result, dto.OrderSummary{
-			ID:            order.ID,
-			Total:         order.Total.Add(order.Tax).Add(order.Shipping),
-			Status:        s.getStatusText(order.Status),
-			PaymentStatus: s.getPaymentStatusText(order.PaymentStatus),
-			CreatedAt:     order.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		})
-	}
-
-	return result, nil
-}
-
-func (s *OrderService) GetOrderDetails(orderID, userID uint) (*dto.OrderDetails, error) {
-	var order models.Order
-	err := s.db.Where("id = ? AND user_id = ?", orderID, userID).
-		Preload("OrderItems").
-		Preload("OrderItems.SKU").
-		Preload("OrderItems.SKU.Product").
-		Preload("Address").
-		First(&order).Error
-
-	if err != nil {
+	// Create OrderItems from CartItems
+	var cartItems []models.CartItem
+	if err := s.db.Where("cart_id = ?", cartID).Find(&cartItems).Error; err != nil {
 		return nil, err
 	}
 
-	var items []dto.OrderItemDto
-	for _, item := range order.OrderItems {
-		items = append(items, dto.OrderItemDto{
-			SKUID:    item.SKUID,
-			SKUCode:  item.SKU.SKUCode,
-			Title:    item.SKU.Product.Title,
-			Qty:      item.Qty,
-			Price:    item.Price,
-			Tax:      item.Tax,
-			SellerID: item.SellerID,
-		})
+	for _, cartItem := range cartItems {
+		// We need to convert cartItem.Price (decimal) to float64
+		itemTotal := decimal.NewFromFloat(float64(cartItem.Qty)).Mul(cartItem.Price) // Total = Qty * Price
+
+		// Save the OrderItem
+		orderItem := models.OrderItem{
+			OrderID:  order.ID,
+			SKUID:    cartItem.SKUID,
+			Qty:      cartItem.Qty,
+			Price:    cartItem.Price.InexactFloat64(), // No conversion needed here; Price is already decimal
+			Total:    itemTotal.InexactFloat64(),      // Convert decimal to float64 safely
+			Tax:      0.0,                             // Placeholder; you can calculate tax if needed
+			SellerID: 0,                               // Placeholder; link to seller if applicable
+		}
+
+		if err := s.db.Create(&orderItem).Error; err != nil {
+			return nil, err
+		}
+
+		// Add to totalAmount (used for order total)
+		totalAmount = totalAmount.Add(itemTotal)
 	}
 
-	return &dto.OrderDetails{
-		ID:            order.ID,
-		Total:         order.Total,
-		Tax:           order.Tax,
-		Shipping:      order.Shipping,
-		GrandTotal:    order.Total.Add(order.Tax).Add(order.Shipping),
-		Status:        s.getStatusText(order.Status),
-		PaymentStatus: s.getPaymentStatusText(order.PaymentStatus),
-		Address:       s.mapAddressToDto(order.Address),
-		Items:         items,
-		CreatedAt:     order.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	}, nil
-}
-
-func (s *OrderService) getStatusText(status int) string {
-	statusMap := map[int]string{
-		0: "New",
-		1: "Confirmed",
-		2: "Shipped",
-		3: "Delivered",
-		4: "Cancelled",
-		5: "Returned",
+	// Update the order with the total amount
+	order.Total = totalAmount.InexactFloat64() // Update the order total
+	if err := s.db.Save(&order).Error; err != nil {
+		return nil, err
 	}
-	return statusMap[status]
-}
 
-func (s *OrderService) getPaymentStatusText(status int) string {
-	statusMap := map[int]string{
-		0: "Pending",
-		1: "Captured",
-		2: "Failed",
-		3: "Refunded",
-	}
-	return statusMap[status]
-}
-
-func (s *OrderService) mapAddressToDto(address models.Address) dto.AddressDto {
-	return dto.AddressDto{
-		ID:      address.ID,
-		Line1:   address.Line1,
-		Line2:   address.Line2,
-		City:    address.City,
-		State:   address.State,
-		Country: address.Country,
-		Pin:     address.Pin,
-	}
+	return order, nil
 }

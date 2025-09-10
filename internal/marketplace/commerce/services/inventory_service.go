@@ -1,10 +1,10 @@
-// internal/marketplace/commerce/services/inventory_service.go
 package services
 
 import (
 	"errors"
 	"gocom/main/internal/models"
 	"gorm.io/gorm"
+	//"time"
 )
 
 type InventoryService struct {
@@ -15,29 +15,60 @@ func NewInventoryService(db *gorm.DB) *InventoryService {
 	return &InventoryService{db: db}
 }
 
-func (s *InventoryService) CheckAvailability(skuID uint, qty int) error {
+// ReserveInventory checks if enough inventory is available and reserves it
+func (s *InventoryService) ReserveInventory(skuID uint, qty int) error {
+	// Find the inventory for the SKU
 	var inventory models.Inventory
-	err := s.db.Where("sku_id = ?", skuID).First(&inventory).Error
-	if err != nil {
+	if err := s.db.Where("sku_id = ?", skuID).First(&inventory).Error; err != nil {
 		return errors.New("inventory not found")
 	}
 
-	available := inventory.OnHand - inventory.Reserved
-	if available < qty {
-		return errors.New("insufficient stock")
+	// Check if enough stock is available
+	if inventory.OnHand-inventory.Reserved < qty {
+		return errors.New("insufficient stock available")
+	}
+
+	// Reserve the inventory
+	inventory.Reserved += qty
+	if err := s.db.Save(&inventory).Error; err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (s *InventoryService) ReserveStock(skuID uint, qty int) error {
-	return s.db.Model(&models.Inventory{}).
-		Where("sku_id = ? AND (on_hand - reserved) >= ?", skuID, qty).
-		Update("reserved", gorm.Expr("reserved + ?", qty)).Error
+// ReleaseInventory releases reserved inventory if payment fails or order is canceled
+func (s *InventoryService) ReleaseInventory(skuID uint, qty int) error {
+	// Find the inventory for the SKU
+	var inventory models.Inventory
+	if err := s.db.Where("sku_id = ?", skuID).First(&inventory).Error; err != nil {
+		return errors.New("inventory not found")
+	}
+
+	// Release the reserved inventory
+	inventory.Reserved -= qty
+	if inventory.Reserved < 0 {
+		inventory.Reserved = 0
+	}
+
+	if err := s.db.Save(&inventory).Error; err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (s *InventoryService) ReleaseReservation(skuID uint, qty int) error {
-	return s.db.Model(&models.Inventory{}).
-		Where("sku_id = ?", skuID).
-		Update("reserved", gorm.Expr("reserved - ?", qty)).Error
+// CheckInventory ensures there is enough stock available
+func (s *InventoryService) CheckInventory(skuID uint, qty int) (bool, error) {
+	// Find the inventory for the SKU
+	var inventory models.Inventory
+	if err := s.db.Where("sku_id = ?", skuID).First(&inventory).Error; err != nil {
+		return false, errors.New("inventory not found")
+	}
+
+	// Check if there is enough inventory
+	if inventory.OnHand-inventory.Reserved >= qty {
+		return true, nil
+	}
+	return false, nil
 }
