@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"gocom/main/internal/models"
 	"gorm.io/gorm"
 	//"errors"
@@ -30,4 +31,32 @@ func (s *AddressService) GetAddresses(userID uint) ([]models.Address, error) {
 		return nil, err
 	}
 	return addresses, nil
+}
+func (s *AddressService) UpdateAddress(userID uint, addressID string, address models.Address) (*models.Address, error) {
+	var existingAddress models.Address
+	if err := s.db.Where("id = ? AND user_id = ?", addressID, userID).First(&existingAddress).Error; err != nil {
+		return nil, errors.New("address not found")
+	}
+
+	// Update fields
+	existingAddress.Line1 = address.Line1
+	existingAddress.Line2 = address.Line2
+	existingAddress.City = address.City
+	existingAddress.State = address.State
+	existingAddress.Country = address.Country
+	existingAddress.Pin = address.Pin
+
+	if err := s.db.Save(&existingAddress).Error; err != nil {
+		return nil, err
+	}
+
+	return &existingAddress, nil
+}
+
+func (s *AddressService) DeleteAddress(userID uint, addressID string) error {
+	if err := s.db.Where("id = ? AND user_id = ?", addressID, userID).Delete(&models.Address{}).Error; err != nil {
+		return errors.New("failed to delete address")
+	}
+
+	return nil
 }

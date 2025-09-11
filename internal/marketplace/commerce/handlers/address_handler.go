@@ -43,3 +43,39 @@ func GetAddresses(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"addresses": addresses})
 	}
 }
+func UpdateAddress(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint("user_id")
+		addressID := c.Param("id")
+
+		var req models.Address
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+			return
+		}
+
+		service := services.NewAddressService(db)
+		address, err := service.UpdateAddress(userID, addressID, req)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"address": address})
+	}
+}
+
+func DeleteAddress(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint("user_id")
+		addressID := c.Param("id")
+
+		service := services.NewAddressService(db)
+		if err := service.DeleteAddress(userID, addressID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Address deleted"})
+	}
+}

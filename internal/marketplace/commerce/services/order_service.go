@@ -76,3 +76,21 @@ func (s *OrderService) CreateOrderFromCart(cartID string, addressID uint) (*mode
 
 	return order, nil
 }
+
+func (s *OrderService) GetOrdersByUser(userID uint) ([]models.Order, error) {
+	var orders []models.Order
+	if err := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&orders).Error; err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func (s *OrderService) GetOrderByID(userID uint, orderID string) (*models.Order, error) {
+	var order models.Order
+	if err := s.db.Preload("Items").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
+		return nil, errors.New("order not found")
+	}
+
+	return &order, nil
+}

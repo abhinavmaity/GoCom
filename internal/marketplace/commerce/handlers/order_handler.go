@@ -33,3 +33,33 @@ func PlaceOrder(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"order_id": order.ID, "order_status": order.Status})
 	}
 }
+func GetOrders(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint("user_id")
+
+		service := services.NewOrderService(db)
+		orders, err := service.GetOrdersByUser(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"orders": orders})
+	}
+}
+
+func GetOrder(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint("user_id")
+		orderID := c.Param("id")
+
+		service := services.NewOrderService(db)
+		order, err := service.GetOrderByID(userID, orderID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"order": order})
+	}
+}

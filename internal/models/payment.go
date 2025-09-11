@@ -1,9 +1,9 @@
 package models
 
 import (
+	"github.com/shopspring/decimal"
 	"time"
-
-	"google.golang.org/genproto/googleapis/type/decimal"
+	//"google.golang.org/genproto/googleapis/type/decimal"
 )
 
 type Payment struct {

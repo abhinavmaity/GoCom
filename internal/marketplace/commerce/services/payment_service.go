@@ -2,8 +2,11 @@ package services
 
 import (
 	"errors"
+	"fmt"
+	"github.com/shopspring/decimal"
 	"gocom/main/internal/models"
 	"gorm.io/gorm"
+	"time"
 	// Add Razorpay SDK or mock the logic for PoC
 )
 
@@ -46,4 +49,27 @@ func (s *PaymentService) CapturePayment(intentID string) (*models.Order, error) 
 
 	// Return the confirmed order
 	return &order, nil
+}
+
+func (s *PaymentService) CreatePaymentIntent(orderID uint, amount float64) (string, error) {
+	// Generate a unique intent ID
+	intentID := fmt.Sprintf("pi_%d_%d", orderID, time.Now().Unix())
+
+	// Create payment record
+	payment := models.Payment{
+		OrderID:  orderID,
+		IntentID: intentID,
+		Provider: "razorpay",
+		Amount:   decimal.NewFromFloat(amount),
+		Status:   0, // pending
+	}
+
+	if err := s.db.Create(&payment).Error; err != nil {
+		return "", err
+	}
+
+	// In a real implementation, you would call Razorpay API here
+	// For PoC, we just return the mock intent ID
+
+	return intentID, nil
 }
